@@ -105,13 +105,22 @@ class LogisticRegressionEstimator(Estimator):
 
 
     def _run_logistic_regression(self) -> RegressionResultsWrapper:
+        #self.df = self.df.loc[:, ~self.df.columns.str.contains('^Unnamed')]
+
         """ Run logistic regression of the treatment and adjustment set against the outcome and return the model.
 
         :return: The model after fitting to data.
         """
         # 1. Reduce dataframe to contain only the necessary columns
         reduced_df = self.df.copy()
+
+        # check necessary_cols for categories, loop through columns that you want to be categories
+
         necessary_cols = list(self.treatment) + list(self.adjustment_set) + list(self.outcome)
+        
+        print('a', necessary_cols)
+        
+
         missing_rows = reduced_df[necessary_cols].isnull().any(axis=1)
         reduced_df = reduced_df[~missing_rows]
         reduced_df = reduced_df.sort_values(list(self.treatment))
@@ -125,7 +134,19 @@ class LogisticRegressionEstimator(Estimator):
         cols += [x for x in self.adjustment_set if x not in cols]
         treatment_and_adjustments_cols = reduced_df[cols + ['Intercept']]
         outcome_col = reduced_df[list(self.outcome)]
-        regression = sm.Logit(outcome_col, treatment_and_adjustments_cols)
+
+        print(outcome_col.dtypes)
+        print(treatment_and_adjustments_cols.dtypes)
+
+        print(self.df[self.treatment].dtypes)
+
+        print(self.df[self.treatment])
+        if(self.df[self.treatment].dtypes.item() == 'object'):
+            print('work')
+            self.df[self.treatment] = self.df[self.treatment].astype('category')
+
+
+        regression = sm.Logit(outcome_col, treatment_and_adjustments_cols.astype('category'))
         model = regression.fit()
         return model
 
@@ -150,8 +171,9 @@ class LogisticRegressionEstimator(Estimator):
         for a, b in self.product_terms:
             x[f"{a}*{b}"] = x[a] * x[b]
         x = x[model.params.index]
-
+        print(x)
         y = model.predict(x)
+
         return y.iloc[1], y.iloc[0]
 
 
@@ -165,7 +187,9 @@ class LogisticRegressionEstimator(Estimator):
         """
         control_outcome, treatment_outcome = self.estimate_control_treatment()
 
-        return treatment_outcome-control_outcome
+
+
+        return treatment_outcome-control_outcome, None
 
 
     def estimate_risk_ratio(self) -> float:
