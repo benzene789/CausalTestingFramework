@@ -7,7 +7,8 @@ from causal_testing.data_collection.data_collector import ObservationalDataColle
 from causal_testing.testing.causal_test_case import CausalTestCase
 from causal_testing.testing.causal_test_outcome import ExactValue, Positive
 from causal_testing.testing.causal_test_engine import CausalTestEngine
-from causal_testing.testing.estimators import LogisticRegressionEstimator, Estimator
+from causal_testing.testing.estimators import Estimator, LogisticRegressionEstimator
+
 
 import pandas as pd
 
@@ -106,16 +107,13 @@ df = df.iloc[1:]
 
 plane_val = df_row['plane_transport']
 
-
-
 # 5. Create a causal test case
 causal_test_case = CausalTestCase(
-    control_input_configuration={country: 'China'},
-    treatment_input_configuration={country: 'Russia'},
+    control_input_configuration={plane_transport: 1},
+    treatment_input_configuration={plane_transport: 0},
     expected_causal_effect=ExactValue(4, tolerance=0.5),
-    outcome_variables={s2},
+    outcome_variables={s1},
     estimate_type="ate",
-    # effect_modifier_configuration={width: wh, height: wh}
 )
 obs_causal_test_result = test_intensity_num_shapes(
     observational_data_path,

@@ -112,44 +112,79 @@ class LogisticRegressionEstimator(Estimator):
 
         :return: The model after fitting to data.
         """
-        
-        # 1. Reduce dataframe to contain only the necessary columns
-        reduced_df = self.df.copy()
+        try:
+            # 1. Reduce dataframe to contain only the necessary columns
+            reduced_df = self.df.copy()
 
-        necessary_cols = list(self.treatment) + list(self.adjustment_set) + list(self.outcome)
-        
-        
-        missing_rows = reduced_df[necessary_cols].isnull().any(axis=1)
-        reduced_df = reduced_df[~missing_rows]
-        reduced_df = reduced_df.sort_values(list(self.treatment))
-        logger.debug(reduced_df[necessary_cols])
+            necessary_cols = list(self.treatment) + list(self.adjustment_set) + list(self.outcome)
+            
+            formula_str = str(self.outcome[0]) + ' ~ ' + str(self.treatment[0])
+            
+            missing_rows = reduced_df[necessary_cols].isnull().any(axis=1)
+            reduced_df = reduced_df[~missing_rows]
+            reduced_df = reduced_df.sort_values(list(self.treatment))
+            logger.debug(reduced_df[necessary_cols])
 
-        # 2. Add intercept
-        reduced_df['Intercept'] = self.intercept
+            # 2. Add intercept
+            reduced_df['Intercept'] = self.intercept
 
-        # 3. Estimate the unit difference in outcome caused by unit difference in treatment
-        cols = list(self.treatment)
-        cols += [x for x in self.adjustment_set if x not in cols]
-        treatment_and_adjustments_cols = reduced_df[cols]
-        outcome_col = reduced_df[list(self.outcome)]
+            # 3. Estimate the unit difference in outcome caused by unit difference in treatment
+            cols = list(self.treatment)
+            cols += [x for x in self.adjustment_set if x not in cols]
+            treatment_and_adjustments_cols = reduced_df[cols]
+            outcome_col = reduced_df[list(self.outcome)]
+            
+            regression = smf.logit(formula=formula_str, data=self.df)
+            model = regression.fit()
+                    
+            return model, ""
         
-        regression = smf.logit(formula='S2 ~ plane_transport', data=self.df)
-        model = regression.fit()
-                
-        return model
+        # LinAlg error, weird numpy business
+        except:
+            # 1. Reduce dataframe to contain only the necessary columns
+            reduced_df = self.df.copy()
+            df_cols = reduced_df.columns
 
+            necessary_cols = list(self.treatment) + list(self.adjustment_set) + list(self.outcome)
+            
+            formula_str = str(self.outcome[0]) +  ' ~ ' + str(self.treatment[0]) 
+            
+            for col in df_cols:
+                if col not in formula_str:
+                    formula_str += '+' + str(df_cols[0])
+                    break
+            
+            missing_rows = reduced_df[necessary_cols].isnull().any(axis=1)
+            reduced_df = reduced_df[~missing_rows]
+            reduced_df = reduced_df.sort_values(list(self.treatment))
+            logger.debug(reduced_df[necessary_cols])
+            
+            # 2. Add intercept
+            reduced_df['Intercept'] = self.intercept
+
+            # 3. Estimate the unit difference in outcome caused by unit difference in treatment
+            cols = list(self.treatment)
+            cols += [x for x in self.adjustment_set if x not in cols]
+            treatment_and_adjustments_cols = reduced_df[cols]
+            outcome_col = reduced_df[list(self.outcome)]
+            
+            regression = smf.logit(formula=formula_str, data=self.df)
+            model = regression.fit()
+            
+            return model, col
 
     def estimate_control_treatment(self) -> tuple[pd.Series, pd.Series]:
         """ Estimate the outcomes under control and treatment.
 
         :return: The average treatment effect and the 95% Wald confidence intervals.
         """
-        model = self._run_logistic_regression()
+        model, col = self._run_logistic_regression()
         self.model = model
 
         x = pd.DataFrame()
         x[self.treatment[0]] = [self.treatment_values, self.control_values]
-        x['distance'] = self.df.distance
+        if col != '':
+            x[col] = self.df[col]
 
         x['Intercept'] = self.intercept
         # for k, v in self.effect_modifiers.items():
@@ -160,22 +195,19 @@ class LogisticRegressionEstimator(Estimator):
         #     x['1/'+t] = 1 / x[t]
         # for a, b in self.product_terms:
         #     x[f"{a}*{b}"] = x[a] * x[b]
-        # x = x[model.params.index]
-        # print(x)
         
-        print(model.params)
-        print(model.params.index)
-        print('x', x)
-
-
+        
+        # x[self.treatment[0]] = x[self.treatment[0]].astype('category')
+        # if not x[self.treatment[0]].dtypes == 'category':
+            
+        #     x = x[model.params.index]
+        # # print(x)
+        
         #print(x[model.params.index])
-        
-        
-        
-        y = model.predict(x)
-        
-        print(y)
                 
+        y = model.predict(x)       
+        
+        print(y.iloc[1], y.iloc[0])         
 
         return y.iloc[1], y.iloc[0]
 
