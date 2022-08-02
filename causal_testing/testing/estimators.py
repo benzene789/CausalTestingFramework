@@ -5,6 +5,7 @@ from statsmodels.regression.linear_model import RegressionResultsWrapper
 from econml.dml import CausalForestDML
 from sklearn.ensemble import GradientBoostingRegressor
 import statsmodels.api as sm
+import statsmodels.formula.api as smf
 import pandas as pd
 import numpy as np
 from causal_testing.specification.variable import Variable
@@ -105,22 +106,19 @@ class LogisticRegressionEstimator(Estimator):
 
 
     def _run_logistic_regression(self) -> RegressionResultsWrapper:
-        #self.df = self.df.loc[:, ~self.df.columns.str.contains('^Unnamed')]
+        self.df = self.df.loc[:, ~self.df.columns.str.contains('^Unnamed')]
 
         """ Run logistic regression of the treatment and adjustment set against the outcome and return the model.
 
         :return: The model after fitting to data.
         """
+        
         # 1. Reduce dataframe to contain only the necessary columns
         reduced_df = self.df.copy()
 
-        # check necessary_cols for categories, loop through columns that you want to be categories
-
         necessary_cols = list(self.treatment) + list(self.adjustment_set) + list(self.outcome)
         
-        print('a', necessary_cols)
         
-
         missing_rows = reduced_df[necessary_cols].isnull().any(axis=1)
         reduced_df = reduced_df[~missing_rows]
         reduced_df = reduced_df.sort_values(list(self.treatment))
@@ -132,22 +130,12 @@ class LogisticRegressionEstimator(Estimator):
         # 3. Estimate the unit difference in outcome caused by unit difference in treatment
         cols = list(self.treatment)
         cols += [x for x in self.adjustment_set if x not in cols]
-        treatment_and_adjustments_cols = reduced_df[cols + ['Intercept']]
+        treatment_and_adjustments_cols = reduced_df[cols]
         outcome_col = reduced_df[list(self.outcome)]
-
-        print(outcome_col.dtypes)
-        print(treatment_and_adjustments_cols.dtypes)
-
-        print(self.df[self.treatment].dtypes)
-
-        print(self.df[self.treatment])
-        if(self.df[self.treatment].dtypes.item() == 'object'):
-            print('work')
-            self.df[self.treatment] = self.df[self.treatment].astype('category')
-
-
-        regression = sm.Logit(outcome_col, treatment_and_adjustments_cols.astype('category'))
+        
+        regression = smf.logit(formula='S2 ~ plane_transport', data=self.df)
         model = regression.fit()
+                
         return model
 
 
@@ -161,18 +149,33 @@ class LogisticRegressionEstimator(Estimator):
 
         x = pd.DataFrame()
         x[self.treatment[0]] = [self.treatment_values, self.control_values]
+        x['distance'] = self.df.distance
+
         x['Intercept'] = self.intercept
-        for k, v in self.effect_modifiers.items():
-            x[k] = v
-        for t in self.square_terms:
-            x[t+'^2'] = x[t] ** 2
-        for t in self.inverse_terms:
-            x['1/'+t] = 1 / x[t]
-        for a, b in self.product_terms:
-            x[f"{a}*{b}"] = x[a] * x[b]
-        x = x[model.params.index]
-        print(x)
+        # for k, v in self.effect_modifiers.items():
+        #     x[k] = v
+        # for t in self.square_terms:
+        #     x[t+'^2'] = x[t] ** 2
+        # for t in self.inverse_terms:
+        #     x['1/'+t] = 1 / x[t]
+        # for a, b in self.product_terms:
+        #     x[f"{a}*{b}"] = x[a] * x[b]
+        # x = x[model.params.index]
+        # print(x)
+        
+        print(model.params)
+        print(model.params.index)
+        print('x', x)
+
+
+        #print(x[model.params.index])
+        
+        
+        
         y = model.predict(x)
+        
+        print(y)
+                
 
         return y.iloc[1], y.iloc[0]
 
@@ -321,6 +324,7 @@ class LinearRegressionEstimator(Estimator):
         t_test_results = model.t_test(individuals.loc['treated'] - individuals.loc['control'])
         ate = t_test_results.effect[0]
         confidence_intervals = list(t_test_results.conf_int().flatten())
+        print('dog')
         return ate, confidence_intervals
 
     def estimate_control_treatment(self) -> tuple[pd.Series, pd.Series]:
@@ -343,6 +347,8 @@ class LinearRegressionEstimator(Estimator):
         for a, b in self.product_terms:
             x[f"{a}*{b}"] = x[a] * x[b]
         x = x[model.params.index]
+        
+        
 
         y = model.get_prediction(x).summary_frame()
         return y.iloc[1], y.iloc[0]
