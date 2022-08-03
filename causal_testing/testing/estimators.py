@@ -187,6 +187,15 @@ class LogisticRegressionEstimator(Estimator):
             x[col] = self.df[col]
 
         x['Intercept'] = self.intercept
+        
+        # For indices that are not in the data frame, error arises from categorical data (category[T.cat] cannot be found)
+        index_exists = False
+        count = 0
+        while not index_exists:
+            if model.params.index[count] not in x.columns:
+                index_exists = True
+            count += 1
+        
         # for k, v in self.effect_modifiers.items():
         #     x[k] = v
         # for t in self.square_terms:
@@ -196,14 +205,9 @@ class LogisticRegressionEstimator(Estimator):
         # for a, b in self.product_terms:
         #     x[f"{a}*{b}"] = x[a] * x[b]
         
-        
-        # x[self.treatment[0]] = x[self.treatment[0]].astype('category')
-        # if not x[self.treatment[0]].dtypes == 'category':
-            
-        #     x = x[model.params.index]
-        # # print(x)
-        
-        #print(x[model.params.index])
+        if not index_exists:
+            x = x[model.params.index]
+
                 
         y = model.predict(x)       
         
