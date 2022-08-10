@@ -112,17 +112,19 @@ class LogisticRegressionEstimator(Estimator):
 
         :return: The model after fitting to data.
         """
+
         try:
             # 1. Reduce dataframe to contain only the necessary columns
             reduced_df = self.df.copy()
 
             necessary_cols = list(self.treatment) + list(self.adjustment_set) + list(self.outcome)
-            
-            formula_str = str(self.outcome[0]) + ' ~ ' + str(self.treatment[0])
+
+            print(necessary_cols)
             
             missing_rows = reduced_df[necessary_cols].isnull().any(axis=1)
             reduced_df = reduced_df[~missing_rows]
             reduced_df = reduced_df.sort_values(list(self.treatment))
+            reduced_df = reduced_df[necessary_cols]
             logger.debug(reduced_df[necessary_cols])
 
             # 2. Add intercept
@@ -131,10 +133,12 @@ class LogisticRegressionEstimator(Estimator):
             # 3. Estimate the unit difference in outcome caused by unit difference in treatment
             cols = list(self.treatment)
             cols += [x for x in self.adjustment_set if x not in cols]
-            treatment_and_adjustments_cols = reduced_df[cols]
-            outcome_col = reduced_df[list(self.outcome)]
             
-            regression = smf.logit(formula=formula_str, data=self.df)
+
+            
+            formula_str = str(self.outcome[0]) + ' ~ ' + str(self.treatment[0]) + '+Intercept'
+
+            regression = smf.logit(formula=formula_str, data=reduced_df)
             model = regression.fit()
                     
             return model, ""
@@ -147,16 +151,17 @@ class LogisticRegressionEstimator(Estimator):
 
             necessary_cols = list(self.treatment) + list(self.adjustment_set) + list(self.outcome)
             
-            formula_str = str(self.outcome[0]) +  ' ~ ' + str(self.treatment[0]) 
+            formula_str = str(self.outcome[0]) +  ' ~ ' + str(self.treatment[0]) + '+Intercept'
             
-            for col in df_cols:
-                if col not in formula_str:
-                    formula_str += '+' + str(df_cols[0])
-                    break
+            # for col in df_cols:
+            #     if col not in formula_str:
+            #         formula_str += '+' + str(df_cols[0])
+            #         break
             
             missing_rows = reduced_df[necessary_cols].isnull().any(axis=1)
             reduced_df = reduced_df[~missing_rows]
             reduced_df = reduced_df.sort_values(list(self.treatment))
+            reduced_df = reduced_df[necessary_cols]
             logger.debug(reduced_df[necessary_cols])
             
             # 2. Add intercept
@@ -165,13 +170,14 @@ class LogisticRegressionEstimator(Estimator):
             # 3. Estimate the unit difference in outcome caused by unit difference in treatment
             cols = list(self.treatment)
             cols += [x for x in self.adjustment_set if x not in cols]
-            treatment_and_adjustments_cols = reduced_df[cols]
-            outcome_col = reduced_df[list(self.outcome)]
             
-            regression = smf.logit(formula=formula_str, data=self.df)
+
+            print(reduced_df)
+            
+            regression = smf.logit(formula='S2~plane_transport+Intercept', data=reduced_df)
             model = regression.fit()
             
-            return model, col
+            return model, ''
 
     def estimate_control_treatment(self) -> tuple[pd.Series, pd.Series]:
         """ Estimate the outcomes under control and treatment.
@@ -187,6 +193,8 @@ class LogisticRegressionEstimator(Estimator):
             x[col] = self.df[col]
 
         x['Intercept'] = self.intercept
+
+        print(x)
         
         # For indices that are not in the data frame, error arises from categorical data (category[T.cat] cannot be found)
         index_exists = False
