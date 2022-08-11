@@ -1,3 +1,4 @@
+from itertools import count
 import string
 from causal_testing.specification.causal_dag import CausalDAG
 from causal_testing.specification.scenario import Scenario
@@ -18,6 +19,8 @@ causal_dag = CausalDAG("./dag.dot")
 # 2. Create variables
 plane_transport = Input("plane_transport", bool)
 country = Input("country", str)
+content = Input('content', str)
+weight = Input('weight', float)
 s1 = Input("S1", bool)
 s2 = Input("S2", bool)
 s3 = Input("S3", bool)
@@ -29,6 +32,8 @@ scenario = Scenario(
     variables={
         plane_transport,
         country,
+        content,
+        weight,
         s1,
         s2,
         s3,
@@ -61,7 +66,15 @@ def test_intensity_num_shapes(
     treatment = list(causal_test_case.control_input_configuration)[0].name
     outcome = list(causal_test_case.outcome_variables)[0].name
 
-    
+    minimal_adjustment_sets = causal_dag.enumerate_minimal_adjustment_sets([v.name for v in causal_test_case.control_input_configuration], [v.name for v in causal_test_case.outcome_variables])
+    minimal_adjustment_set = min(minimal_adjustment_sets, key=len)
+
+    minimal_adjustment_set = \
+            minimal_adjustment_set - {v.name for v in causal_test_case.control_input_configuration}
+    minimal_adjustment_set = minimal_adjustment_set - {v.name for v in causal_test_case.outcome_variables}
+
+    print(minimal_adjustment_set)
+
     estimator = LogisticRegressionEstimator(
         treatment=[treatment],
         control_values=list(causal_test_case.control_input_configuration.values())[
@@ -70,7 +83,7 @@ def test_intensity_num_shapes(
         treatment_values=list(
             causal_test_case.treatment_input_configuration.values()
         )[0],
-        adjustment_set=set(),
+        adjustment_set=minimal_adjustment_set,
         outcome=[outcome],
         df=data,
     )
@@ -83,7 +96,7 @@ def test_intensity_num_shapes(
     return causal_test_result
 
 
-observational_data_path = "data/random_complex.csv"
+observational_data_path = "data/new_test.csv"
 
 intensity_num_shapes_results = []
 
@@ -110,7 +123,7 @@ causal_test_case = CausalTestCase(
     control_input_configuration={plane_transport: 1},
     treatment_input_configuration={plane_transport: 0},
     expected_causal_effect=ExactValue(4, tolerance=0.5),
-    outcome_variables={s1},
+    outcome_variables={alarm},
     estimate_type="ate",
 )
 obs_causal_test_result = test_intensity_num_shapes(

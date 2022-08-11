@@ -6,6 +6,7 @@ from econml.dml import CausalForestDML
 from sklearn.ensemble import GradientBoostingRegressor
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
+import statsmodels.api as sm
 import pandas as pd
 import numpy as np
 from causal_testing.specification.variable import Variable
@@ -113,113 +114,57 @@ class LogisticRegressionEstimator(Estimator):
         :return: The model after fitting to data.
         """
 
-        try:
-            # 1. Reduce dataframe to contain only the necessary columns
-            reduced_df = self.df.copy()
+        # 1. Reduce dataframe to contain only the necessary columns
+        reduced_df = self.df.copy()
 
-            necessary_cols = list(self.treatment) + list(self.adjustment_set) + list(self.outcome)
+        necessary_cols = list(self.treatment) + list(self.adjustment_set) + list(self.outcome)
 
-            print(necessary_cols)
-            
-            missing_rows = reduced_df[necessary_cols].isnull().any(axis=1)
-            reduced_df = reduced_df[~missing_rows]
-            reduced_df = reduced_df.sort_values(list(self.treatment))
-            reduced_df = reduced_df[necessary_cols]
-            logger.debug(reduced_df[necessary_cols])
-
-            # 2. Add intercept
-            reduced_df['Intercept'] = self.intercept
-
-            # 3. Estimate the unit difference in outcome caused by unit difference in treatment
-            cols = list(self.treatment)
-            cols += [x for x in self.adjustment_set if x not in cols]
-            
-
-            
-            formula_str = str(self.outcome[0]) + ' ~ ' + str(self.treatment[0]) + '+Intercept'
-
-            regression = smf.logit(formula=formula_str, data=reduced_df)
-            model = regression.fit()
-                    
-            return model, ""
+        print(necessary_cols)
         
-        # LinAlg error, weird numpy business
-        except:
-            # 1. Reduce dataframe to contain only the necessary columns
-            reduced_df = self.df.copy()
-            df_cols = reduced_df.columns
+        missing_rows = reduced_df[necessary_cols].isnull().any(axis=1)
+        reduced_df = reduced_df[~missing_rows]
+        reduced_df = reduced_df.sort_values(list(self.treatment))
+        reduced_df = reduced_df[necessary_cols]
+        logger.debug(reduced_df[necessary_cols])
 
-            necessary_cols = list(self.treatment) + list(self.adjustment_set) + list(self.outcome)
-            
-            formula_str = str(self.outcome[0]) +  ' ~ ' + str(self.treatment[0]) + '+Intercept'
-            
-            # for col in df_cols:
-            #     if col not in formula_str:
-            #         formula_str += '+' + str(df_cols[0])
-            #         break
-            
-            missing_rows = reduced_df[necessary_cols].isnull().any(axis=1)
-            reduced_df = reduced_df[~missing_rows]
-            reduced_df = reduced_df.sort_values(list(self.treatment))
-            reduced_df = reduced_df[necessary_cols]
-            logger.debug(reduced_df[necessary_cols])
-            
-            # 2. Add intercept
-            reduced_df['Intercept'] = self.intercept
+        # 2. Add intercept
+        reduced_df['intercept'] = self.intercept
 
-            # 3. Estimate the unit difference in outcome caused by unit difference in treatment
-            cols = list(self.treatment)
-            cols += [x for x in self.adjustment_set if x not in cols]
-            
 
-            print(reduced_df)
-            
-            regression = smf.logit(formula='S2~plane_transport+Intercept', data=reduced_df)
-            model = regression.fit()
-            
-            return model, ''
+        # 3. Estimate the unit difference in outcome caused by unit difference in treatment
+        cols = list(self.treatment)
+        cols += [x for x in self.adjustment_set if x not in cols]
+
+        print('treatment', reduced_df[[self.treatment[0]]].dtypes)
+
+        if(reduced_df[[self.treatment[0]]].dtypes.item() == 'object'):
+            print(self.treatment[0])
+            formula_string = str(self.outcome[0]) + '~C(' + str(self.treatment[0]) + ",Treatment('"+ str(self.control_values) + "'))"
+            regression = smf.logit(formula=formula_string, data=reduced_df).fit(maxiters=50)
+
+            print(regression.summary())
+        else:
+            # regression for set of 2 data points
+            regression = sm.Logit(reduced_df[self.outcome[0]].to_numpy(), reduced_df[[self.treatment[0], 'intercept']].to_numpy()).fit(maxiters=50)
+        
+        return regression
 
     def estimate_control_treatment(self) -> tuple[pd.Series, pd.Series]:
         """ Estimate the outcomes under control and treatment.
 
         :return: The average treatment effect and the 95% Wald confidence intervals.
         """
-        model, col = self._run_logistic_regression()
+        model = self._run_logistic_regression()
         self.model = model
 
         x = pd.DataFrame()
         x[self.treatment[0]] = [self.treatment_values, self.control_values]
-        if col != '':
-            x[col] = self.df[col]
 
-        x['Intercept'] = self.intercept
+        x['intercept'] = self.intercept
 
-        print(x)
-        
-        # For indices that are not in the data frame, error arises from categorical data (category[T.cat] cannot be found)
-        index_exists = False
-        count = 0
-        while not index_exists:
-            if model.params.index[count] not in x.columns:
-                index_exists = True
-            count += 1
-        
-        # for k, v in self.effect_modifiers.items():
-        #     x[k] = v
-        # for t in self.square_terms:
-        #     x[t+'^2'] = x[t] ** 2
-        # for t in self.inverse_terms:
-        #     x['1/'+t] = 1 / x[t]
-        # for a, b in self.product_terms:
-        #     x[f"{a}*{b}"] = x[a] * x[b]
-        
-        if not index_exists:
-            x = x[model.params.index]
-
-                
         y = model.predict(x)       
         
-        print(y.iloc[1], y.iloc[0])         
+        print(y.iloc[1], y.iloc[0])      
 
         return y.iloc[1], y.iloc[0]
 
@@ -368,7 +313,6 @@ class LinearRegressionEstimator(Estimator):
         t_test_results = model.t_test(individuals.loc['treated'] - individuals.loc['control'])
         ate = t_test_results.effect[0]
         confidence_intervals = list(t_test_results.conf_int().flatten())
-        print('dog')
         return ate, confidence_intervals
 
     def estimate_control_treatment(self) -> tuple[pd.Series, pd.Series]:
