@@ -39,8 +39,8 @@ def trigger_alarm(s1: int, s2: int, s3: int) -> bool:
     return int(random < trigger_alarm_chance)
 
 
-df_rows = []
-for row in range(10000):
+def new_shipment():
+    
     df_row = []
 
     s1_triggered = 0
@@ -60,7 +60,7 @@ for row in range(10000):
     country_pick = int(np.random.randint(0, 3))
     country_key = list(countries.keys())[country_pick]
 
-    content_pick = int(np.random.randint(0, 4))
+    content_pick = int(np.random.randint(0, 3))
     content_key = list(content_types.keys())[content_pick]
     weight = np.random.rand() * 100
 
@@ -84,6 +84,14 @@ for row in range(10000):
     df_row.append(s3_triggered)
     df_row.append(alarm_triggered)
 
+    return df_row
+
+
+df_rows = []
+for row in range(10000):
+
+    df_row = new_shipment()
+    
     df_rows.append(df_row)
 
 df = pd.DataFrame(df_rows, columns=['country', 'plane_transport', 'content', 'weight', 'S1', 'S2', 'S3', 'alarm'])

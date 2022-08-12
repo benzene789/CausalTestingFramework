@@ -170,6 +170,7 @@ class CausalDAG(nx.DiGraph):
         :param outcomes: A list of outcomes.
         :return: A CausalDAG corresponding to the proper back-door graph.
         """
+        
         for var in treatments + outcomes:
             if var not in self.graph.nodes:
                 raise IndexError(f"{var} not a node in Causal DAG.\nValid nodes are{self.graph.nodes}.")

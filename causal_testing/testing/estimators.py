@@ -118,8 +118,6 @@ class LogisticRegressionEstimator(Estimator):
         reduced_df = self.df.copy()
 
         necessary_cols = list(self.treatment) + list(self.adjustment_set) + list(self.outcome)
-
-        print(necessary_cols)
         
         missing_rows = reduced_df[necessary_cols].isnull().any(axis=1)
         reduced_df = reduced_df[~missing_rows]
@@ -130,16 +128,18 @@ class LogisticRegressionEstimator(Estimator):
         # 2. Add intercept
         reduced_df['intercept'] = self.intercept
 
-
         # 3. Estimate the unit difference in outcome caused by unit difference in treatment
         cols = list(self.treatment)
         cols += [x for x in self.adjustment_set if x not in cols]
 
-        print('treatment', reduced_df[[self.treatment[0]]].dtypes)
+        #print('treatment', reduced_df[[self.treatment[0]]].dtypes)
+
+        # Categorical data
+        #print(reduced_df[[self.treatment[0]]].dtypes.item())
 
         if(reduced_df[[self.treatment[0]]].dtypes.item() == 'object'):
-            print(self.treatment[0])
             formula_string = str(self.outcome[0]) + '~C(' + str(self.treatment[0]) + ",Treatment('"+ str(self.control_values) + "'))"
+            print(formula_string)
             regression = smf.logit(formula=formula_string, data=reduced_df).fit(maxiters=50)
 
             print(regression.summary())
@@ -164,8 +164,6 @@ class LogisticRegressionEstimator(Estimator):
 
         y = model.predict(x)       
         
-        print(y.iloc[1], y.iloc[0])      
-
         return y.iloc[1], y.iloc[0]
 
 

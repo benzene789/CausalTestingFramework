@@ -10,7 +10,6 @@ from causal_testing.testing.causal_test_outcome import ExactValue, Positive
 from causal_testing.testing.causal_test_engine import CausalTestEngine
 from causal_testing.testing.estimators import Estimator, LogisticRegressionEstimator
 
-
 import pandas as pd
 
 # 1. Read in the Causal DAG
@@ -45,7 +44,7 @@ scenario = Scenario(
 causal_specification = CausalSpecification(scenario, causal_dag)
 
 
-def test_intensity_num_shapes(
+def test_shipment(
     observational_data_path,
     causal_test_case,
 ):

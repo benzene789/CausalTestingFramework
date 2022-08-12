@@ -1,3 +1,4 @@
+from audioop import mul
 from causal_testing.specification.causal_dag import CausalDAG
 from causal_testing.specification.scenario import Scenario
 from causal_testing.specification.variable import Input, Output
@@ -7,10 +8,23 @@ from causal_testing.testing.causal_test_case import CausalTestCase
 from causal_testing.testing.causal_test_outcome import ExactValue, Positive
 from causal_testing.testing.causal_test_engine import CausalTestEngine
 from causal_testing.testing.estimators import Estimator, LogisticRegressionEstimator
+from data.improved_csv_gen import new_shipment
+import multiprocessing
 
 import pandas as pd
 import numpy as np
 import random
+
+np.random.seed(random.randint(0, 50000))
+
+content_types = {'tiles': 0.65,
+                 'electrical': 0.25,
+                 'wood': 0.45,
+                 'banana': 0.90}
+
+countries = {'China': 0.25,
+             'France': 0.60,
+             'Russia': 0.90}
 
 # 1. Read in the Causal DAG
 causal_dag = CausalDAG("./dag.dot")
@@ -18,6 +32,8 @@ causal_dag = CausalDAG("./dag.dot")
 # 2. Create variables
 plane_transport = Input("plane_transport", bool)
 country = Input("country", str)
+content = Input('content', str)
+weight = Input('weight', float)
 s1 = Input("S1", bool)
 s2 = Input("S2", bool)
 s3 = Input("S3", bool)
@@ -29,6 +45,8 @@ scenario = Scenario(
     variables={
         plane_transport,
         country,
+        content,
+        weight,
         s1,
         s2,
         s3,
@@ -36,156 +54,12 @@ scenario = Scenario(
     }
 )
 
-def generate_mock_row():
-    np.random.seed(random.randint(0, 50000))
-    df_row = []
-
-    s1_triggered = 0
-    s2_triggered = 0
-    s3_triggered = 0
-    alarm_triggered = 0
-
-    # plane or ship
-    plane = np.random.randint(0,2)
-
-    # Planes have 50% chance, ship has 50%
-    if plane:
-        s1_triggered = trigger_s1_or_s2(0.5)
-    else:
-        s2_triggered = trigger_s1_or_s2(0.5)
-
-    country_pick = int(np.random.randint(0, 3))
-    country_key = list(countries.keys())[country_pick]
-
-    content_pick = int(np.random.randint(0, 3))
-    content_key = list(content_types.keys())[content_pick]
-    weight = np.random.rand() * 100
-
-    s3_triggered = trigger_s3(country_key, content_key, weight)
-
-    alarm_triggered = trigger_alarm(s1_triggered, s2_triggered, s3_triggered)
-
-    if alarm_triggered > 0.4:
-        alarm_triggered = 1
-    else:
-        alarm_triggered = 0
-
-    # Sort out rows of df
-
-    df_row.append(country_key)
-    df_row.append(plane)
-    df_row.append(content_key)
-    df_row.append(weight)
-    df_row.append(s1_triggered)
-    df_row.append(s2_triggered)
-    df_row.append(s3_triggered)
-    df_row.append(alarm_triggered)
-        
-    df = pd.DataFrame([df_row], columns=['country', 'plane_transport', 'content', 'weight', 'S1', 'S2', 'S3', 'alarm'])
-
-    return df
-
-def trigger_s1_or_s2(chance: float) -> bool:    
-    return int(np.random.uniform() > chance)
-
-content_types = {'tiles': 0.65,
-                 'electrical': 0.25,
-                 'wood': 0.45}
-
-countries = {'China': 0.25,
-             'France': 0.60,
-             'Russia': 0.90}
-
-# Both country and content contribute to S3
-def trigger_s3(country: str, content: str, weight: float) -> bool:
-
-    trigger_s3_chance = (countries[country] + content_types[content] + weight/100) / 3
-
-    print(trigger_s3_chance)
-
-    random = np.random.rand()
-
-    return int(random > trigger_s3_chance)
-
-
-def trigger_alarm(s1: int, s2: int, s3: int) -> bool:
-    s1_prob = 0.4
-    s2_prob = 0.5
-    s3_prob = 0.7
-
-    random = np.random.rand()
-
-    trigger_alarm_chance = ((s1_prob * s1) + (s2_prob * s2) + (s3_prob * s3)) / (s1_prob + s2_prob + s3_prob)
-    
-    if s1 == 0 and s2 == 0 and s3 == 0:
-        trigger_alarm_chance = 1
-    
-    return int(random > trigger_alarm_chance)
-
-
-'''
-For each edge, get treatment and outcome. Fuzz treatment and examine effect of treatment on alarm
-Calculate if change in alarm, if there is calculate distance from original value
-
-'''
-
-# Get all edges
-edges = []
-for edge in causal_dag.graph:
-    edges.append(edge)
-        
-print(edges)
-
-# alarm
-outcome = edges[len(causal_dag.graph)-1]
-
-edges.remove(outcome)
-edges.remove('distance')
-# Separate out layers of DAG into separate lists
-
-layer_1 = [dag_edge for dag_edge in edges if 'S'.upper() not in dag_edge]
-sensor_layer = list(set(edges) - set(layer_1))
-outcome = [outcome]
-print(layer_1)
-print(sensor_layer)
-print(outcome)
-
-# Now we generate a mock row of the csv
-
-mock_row = generate_mock_row()
-# Fuzz the different nodes in outer layer
-for fuzz in layer_1:
-    # Get fuzz value
-    fuzz_value = mock_row[fuzz]
-    print(mock_row)
-    
-    # Pick a different content
-    if fuzz == 'content':
-        content_keys = content_types.keys()
-        remaining = list(content_keys - fuzz_value)
-        new_type = remaining[np.random.randint(len(remaining))]
-        
-        mock_row[fuzz] = new_type
-        
-    # Using this new data frame, see if the alarm changes
-    
-    new_s1_s2_val = trigger_s1_or_s2(0.5)
-    print(mock_row)
-    new_s3_val = trigger_s3(mock_row.loc[0]['country'], mock_row.loc[0]['content'], mock_row.loc[0]['weight'])
-    
-    print(new_s1_s2_val)
-    print(new_s3_val)
-    
-   
-
-    quit()
-    
-quit()
-
 # 4. Construct a causal specification from the scenario and causal DAG
 causal_specification = CausalSpecification(scenario, causal_dag)
 
-def test_intensity_num_shapes(
+observational_data_path = 'data/new_test.csv'
+
+def test_shipment(
     observational_data_path,
     causal_test_case,
 ):
@@ -206,7 +80,15 @@ def test_intensity_num_shapes(
     treatment = list(causal_test_case.control_input_configuration)[0].name
     outcome = list(causal_test_case.outcome_variables)[0].name
 
-    
+    minimal_adjustment_sets = causal_dag.enumerate_minimal_adjustment_sets([v.name for v in causal_test_case.control_input_configuration], [v.name for v in causal_test_case.outcome_variables])
+    minimal_adjustment_set = min(minimal_adjustment_sets, key=len)
+
+    minimal_adjustment_set = \
+            minimal_adjustment_set - {v.name for v in causal_test_case.control_input_configuration}
+    minimal_adjustment_set = minimal_adjustment_set - {v.name for v in causal_test_case.outcome_variables}
+
+    print(minimal_adjustment_set)
+
     estimator = LogisticRegressionEstimator(
         treatment=[treatment],
         control_values=list(causal_test_case.control_input_configuration.values())[
@@ -215,7 +97,7 @@ def test_intensity_num_shapes(
         treatment_values=list(
             causal_test_case.treatment_input_configuration.values()
         )[0],
-        adjustment_set=set(),
+        adjustment_set=minimal_adjustment_set,
         outcome=[outcome],
         df=data,
     )
@@ -228,4 +110,133 @@ def test_intensity_num_shapes(
     return causal_test_result
 
 
-observational_data_path = "data/random_complex.csv"
+def get_ate(name, control, treatment ):
+    # 5. Create a causal test case
+    causal_test_case = CausalTestCase(
+        control_input_configuration={scenario.variables[name]: control},
+        treatment_input_configuration={scenario.variables[name]: treatment},
+        expected_causal_effect=ExactValue(4, tolerance=0.5),
+        outcome_variables={alarm},
+        estimate_type="ate",
+    )
+    obs_causal_test_result = test_shipment(
+        observational_data_path,
+        causal_test_case,
+    )
+
+    # print("Observational", end=" ")
+    # print(obs_causal_test_result)
+
+    return obs_causal_test_result.ate
+
+'''
+For each edge, get treatment and outcome. Fuzz treatment and examine effect of treatment on alarm
+Calculate if change in alarm, if there is calculate distance from original value
+
+'''
+
+# Get all edges
+edges = []
+for edge in causal_dag.graph:
+    edges.append(edge)
+
+# alarm
+outcome = edges[len(causal_dag.graph)-1]
+
+edges.remove(outcome)
+edges.remove('distance')
+# Separate out layers of DAG into separate lists
+
+layer_1 = [dag_edge for dag_edge in edges if 'S'.upper() not in dag_edge]
+sensor_layer = list(set(edges) - set(layer_1))
+outcome = [outcome]
+
+# Now we generate a mock row of the csv
+
+shipment = new_shipment()
+shipment_df =  pd.DataFrame([shipment], columns=['country', 'plane_transport', 'content', 'weight', 'S1', 'S2', 'S3', 'alarm'])
+print(shipment_df)
+# Fuzz the different nodes in outer layer
+for fuzz_type in layer_1:
+    print(fuzz_type)
+    # Get fuzz value
+    seen = shipment_df[fuzz_type].to_numpy()[0]
+
+    ates = []
+
+    # Pick a different content
+    # if fuzz_type == 'content':
+
+    #     # Train model on content
+        
+    #     content_keys = list(content_types.keys())
+    #     content_keys.remove(seen)
+    #     remaining = list(content_keys)
+
+    #     fuzzed = remaining[np.random.randint(len(remaining))]
+
+    #     ates.append((fuzzed, get_ate(fuzz_type, seen, fuzzed)))
+
+    #     remaining.remove(fuzzed)
+
+    #     for fuzz in remaining:
+    #         ates.append((fuzz, get_ate(fuzz_type, seen, fuzz)))
+
+    #     print('ATES for ' + seen, ates)
+
+    #     print('=' * 150)
+    #     print('Seen value: ', seen)
+    #     for val in ates:
+    #         print_str = 'If ' + str(val[0]) +' would have come in except ' + str(seen) + ' then alarm would have gone off ' + str(val[1]) + ' more likely'
+    #         print(print_str)
+
+    # if fuzz_type == 'country':
+
+    #     # Train model on country
+        
+    #     country_keys = list(countries.keys())
+    #     country_keys.remove(seen)
+    #     remaining = list(country_keys)
+
+    #     fuzzed = remaining[np.random.randint(len(remaining))]
+
+    #     ates.append((fuzzed, get_ate(fuzz_type, seen, fuzzed)))
+
+    #     remaining.remove(fuzzed)
+
+    #     for fuzz in remaining:
+    #         ates.append((fuzz, get_ate(fuzz_type, seen, fuzz)))
+
+    #     print('ATES for ' + seen, ates)
+
+    #     print('=' * 150)
+    #     print('Seen value: ', seen)
+    #     for val in ates:
+    #         print_str = 'If shipment came in via ' + str(val[0]) +' instead of ' + str(seen) + ' then alarm would have gone off ' + str(val[1]) + ' more likely'
+    #         print(print_str)
+
+    # Non-categorical, binary only
+    # if fuzz_type == 'plane_transport':
+    #     # Came on plane
+    #     if seen == 1:
+    #         fuzz = 0
+    #         ates.append(('ship', get_ate(fuzz_type, seen, fuzz)))
+    #         vehicle = 'plane'
+    #     else:
+    #         fuzz = 1
+    #         ates.append(('plane', get_ate(fuzz_type, seen, fuzz)))
+    #         vehicle = 'ship'
+
+    #     print_str = 'If shipment came in via ' + str(ates[0][0]) +' instead of ' + vehicle+ ' then alarm would have gone off ' + str(ates[0][1]) + ' more likely'
+    #     print(print_str)
+
+    # Non-categorical, float
+    if fuzz_type == 'weight':
+
+        # Trial 1000 different numbers
+        for val in range(20):
+            fuzzed_weight = np.random.rand() * 100
+            ates.append((fuzzed_weight, get_ate(fuzz_type, seen, fuzzed_weight)))
+
+        for val in ates:
+            print(val[1])
