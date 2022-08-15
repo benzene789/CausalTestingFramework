@@ -18,7 +18,8 @@ class CausalTestCase:
 
     def __init__(self, control_input_configuration: dict[Variable: Any], expected_causal_effect: CausalTestOutcome,
                  outcome_variables: dict[Variable], treatment_input_configuration: dict[Variable: Any] = None,
-                 estimate_type: str = "ate", effect_modifier_configuration: dict[Variable: Any] = None, effect: str = "total"):
+                 estimate_type: str = "ate", effect_modifier_configuration: dict[Variable: Any] = None, effect: str = "total",
+                 adjustment_set_configuration: dict[Variable: Any] = None):
         """
         When a CausalTestCase is initialised, it takes the intervention and applies it to the input configuration to
         create two distinct input configurations: a control input configuration and a treatment input configuration.
@@ -30,18 +31,25 @@ class CausalTestCase:
         :param treatment_input_configuration: The input configuration representing the treatment values of the treatment
         variables. That is, the input configuration *after* applying the intervention.
         """
+        print('EFFECT', effect)
         self.control_input_configuration = control_input_configuration
         self.expected_causal_effect = expected_causal_effect
         self.outcome_variables = outcome_variables
         self.treatment_input_configuration = treatment_input_configuration
         self.estimate_type = estimate_type
         self.effect = effect
+        
         if effect_modifier_configuration:
             self.effect_modifier_configuration = effect_modifier_configuration
         else:
             self.effect_modifier_configuration = dict()
         assert self.control_input_configuration.keys() == self.treatment_input_configuration.keys(),\
                "Control and treatment input configurations must have the same keys."
+
+        if adjustment_set_configuration:
+            self.adjustment_set_configuration = adjustment_set_configuration
+        else:
+            self.adjustment_set_configuration = dict()
 
     def get_treatment_variables(self):
         """Return a list of the treatment variables (as strings) for this causal test case."""

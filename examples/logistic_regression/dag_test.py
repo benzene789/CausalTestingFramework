@@ -62,6 +62,7 @@ observational_data_path = 'data/new_test.csv'
 def test_shipment(
     observational_data_path,
     causal_test_case,
+    shipment
 ):
     # 6. Create a data collector
     data_collector = ObservationalDataCollector(scenario, observational_data_path)
@@ -88,6 +89,7 @@ def test_shipment(
     minimal_adjustment_set = minimal_adjustment_set - {v.name for v in causal_test_case.outcome_variables}
 
     print(minimal_adjustment_set)
+    print(shipment)
 
     estimator = LogisticRegressionEstimator(
         treatment=[treatment],
@@ -97,7 +99,8 @@ def test_shipment(
         treatment_values=list(
             causal_test_case.treatment_input_configuration.values()
         )[0],
-        adjustment_set=minimal_adjustment_set,
+        adjustment_set={'S3'},
+        adjustment_set_configuration={scenario.variables[k]:shipment[k][0] for k in minimal_adjustment_set},
         outcome=[outcome],
         df=data,
     )
@@ -110,7 +113,7 @@ def test_shipment(
     return causal_test_result
 
 
-def get_ate(name, control, treatment ):
+def get_ate(name, control, treatment, shipment):
     # 5. Create a causal test case
     causal_test_case = CausalTestCase(
         control_input_configuration={scenario.variables[name]: control},
@@ -122,6 +125,7 @@ def get_ate(name, control, treatment ):
     obs_causal_test_result = test_shipment(
         observational_data_path,
         causal_test_case,
+        shipment
     )
 
     # print("Observational", end=" ")
@@ -175,12 +179,12 @@ for fuzz_type in layer_1:
 
     #     fuzzed = remaining[np.random.randint(len(remaining))]
 
-    #     ates.append((fuzzed, get_ate(fuzz_type, seen, fuzzed)))
+    #     ates.append((fuzzed, get_ate(fuzz_type, seen, fuzzed, shipment_df)))
 
     #     remaining.remove(fuzzed)
 
     #     for fuzz in remaining:
-    #         ates.append((fuzz, get_ate(fuzz_type, seen, fuzz)))
+    #         ates.append((fuzz, get_ate(fuzz_type, seen, fuzz, shipment_df)))
 
     #     print('ATES for ' + seen, ates)
 
@@ -200,12 +204,12 @@ for fuzz_type in layer_1:
 
     #     fuzzed = remaining[np.random.randint(len(remaining))]
 
-    #     ates.append((fuzzed, get_ate(fuzz_type, seen, fuzzed)))
+    #     ates.append((fuzzed, get_ate(fuzz_type, seen, fuzzed, shipment_df)))
 
     #     remaining.remove(fuzzed)
 
     #     for fuzz in remaining:
-    #         ates.append((fuzz, get_ate(fuzz_type, seen, fuzz)))
+    #         ates.append((fuzz, get_ate(fuzz_type, seen, fuzz, shipment_df)))
 
     #     print('ATES for ' + seen, ates)
 
@@ -220,23 +224,24 @@ for fuzz_type in layer_1:
     #     # Came on plane
     #     if seen == 1:
     #         fuzz = 0
-    #         ates.append(('ship', get_ate(fuzz_type, seen, fuzz)))
+    #         ates.append(('ship', get_ate(fuzz_type, seen, fuzz, shipment_df)))
     #         vehicle = 'plane'
     #     else:
     #         fuzz = 1
-    #         ates.append(('plane', get_ate(fuzz_type, seen, fuzz)))
+    #         ates.append(('plane', get_ate(fuzz_type, seen, fuzz, shipment_df)))
     #         vehicle = 'ship'
 
     #     print_str = 'If shipment came in via ' + str(ates[0][0]) +' instead of ' + vehicle+ ' then alarm would have gone off ' + str(ates[0][1]) + ' more likely'
     #     print(print_str)
 
     # Non-categorical, float
-    if fuzz_type == 'weight':
+    # if fuzz_type == 'weight':
 
-        # Trial 1000 different numbers
-        for val in range(20):
-            fuzzed_weight = np.random.rand() * 100
-            ates.append((fuzzed_weight, get_ate(fuzz_type, seen, fuzzed_weight)))
+    #     # Trial 1000 different numbers
+    #     for val in range(2):
+    #         fuzzed_weight = np.random.rand() * 100
+    #         ates.append((fuzzed_weight, get_ate(fuzz_type, seen, fuzzed_weight, shipment_df)))
 
-        for val in ates:
-            print(val[1])
+    #     for val in ates:
+    #         print_str = 'If shipment came in weighing ' + str(val[0]) +' instead of weighing ' + str(seen)+ ' then alarm would have gone off ' + str(val[1]) + ' more likely'
+    #         print(print_str)

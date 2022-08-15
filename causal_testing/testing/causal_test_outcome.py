@@ -1,4 +1,6 @@
 from abc import ABC, abstractmethod
+from tkinter import N
+from tkinter.messagebox import NO
 from typing import Union, Any
 import numpy as np
 from causal_testing.specification.variable import Variable
@@ -11,7 +13,8 @@ class CausalTestResult:
 
     def __init__(self, treatment: tuple, outcome: tuple, treatment_value: Union[int, float, str],
                  control_value: Union[int, float, str], adjustment_set: set, ate: float,
-                 confidence_intervals: [float, float] = None, effect_modifier_configuration: {Variable: Any} = None):
+                 confidence_intervals: [float, float] = None, effect_modifier_configuration: {Variable: Any} = None,
+                 adjustment_set_configuration: {Variable: Any} = None):
         self.treatment = treatment
         self.outcome = outcome
         self.treatment_value = treatment_value
@@ -27,6 +30,11 @@ class CausalTestResult:
             self.effect_modifier_configuration = effect_modifier_configuration
         else:
             self.effect_modifier_configuration = dict()
+
+        if adjustment_set_configuration is not None:
+            self.adjustment_set_configuration = adjustment_set_configuration
+        else:
+            self.adjustment_set_configuration = dict()
 
     def __str__(self):
         base_str = f"Causal Test Result\n==============\n" \

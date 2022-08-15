@@ -60,11 +60,13 @@ class CausalTestEngine:
         self.scenario_execution_data_df = self.data_collector.collect_data(**kwargs)
 
         minimal_adjustment_sets = []
+        print('x', self.causal_test_case.effect)
         if self.causal_test_case.effect == "total":
             minimal_adjustment_sets = self.casual_dag.enumerate_minimal_adjustment_sets(
                     [v.name for v in self.treatment_variables],
                     [v.name for v in self.causal_test_case.outcome_variables]
                 )
+            print('mas', minimal_adjustment_sets)
         elif self.causal_test_case.effect == "direct":
             minimal_adjustment_sets = self.casual_dag.direct_effect_adjustment_sets(
                     [v.name for v in self.treatment_variables],
@@ -136,6 +138,7 @@ class CausalTestEngine:
                     adjustment_set=estimator.adjustment_set,
                     ate=cates_df,
                     effect_modifier_configuration=self.causal_test_case.effect_modifier_configuration,
+                    adjustment_set_configuration = self.causal_test_case.adjustment_set_configuration,
                     confidence_intervals=confidence_intervals)
         elif estimate_type == "risk_ratio":
             logger.debug("calculating risk_ratio")
@@ -148,6 +151,7 @@ class CausalTestEngine:
                 adjustment_set=estimator.adjustment_set,
                 ate=risk_ratio,
                 effect_modifier_configuration=self.causal_test_case.effect_modifier_configuration,
+                adjustment_set_configuration=self.causal_test_case.adjustment_set_configuration,
                 confidence_intervals=confidence_intervals)
         elif estimate_type == "ate":
             logger.debug("calculating ate")
@@ -160,6 +164,7 @@ class CausalTestEngine:
                 adjustment_set=estimator.adjustment_set,
                 ate=ate,
                 effect_modifier_configuration=self.causal_test_case.effect_modifier_configuration,
+                adjustment_set_configuration=self.causal_test_case.adjustment_set_configuration,
                 confidence_intervals=confidence_intervals)
             # causal_test_result = CausalTestResult(minimal_adjustment_set, ate, confidence_intervals)
             # causal_test_result.apply_test_oracle_procedure(self.causal_test_case.expected_causal_effect)
@@ -174,6 +179,7 @@ class CausalTestEngine:
                 adjustment_set=estimator.adjustment_set,
                 ate=ate,
                 effect_modifier_configuration=self.causal_test_case.effect_modifier_configuration,
+                adjustment_set_configuration=self.causal_test_case.adjustment_set_configuration,
                 confidence_intervals=confidence_intervals)
             # causal_test_result = CausalTestResult(minimal_adjustment_set, ate, confidence_intervals)
             # causal_test_result.apply_test_oracle_procedure(self.causal_test_case.expected_causal_effect)

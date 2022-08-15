@@ -1,5 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
+from os import PRIO_PGRP
+from tkinter.messagebox import NO
 from typing import Any
 from statsmodels.regression.linear_model import RegressionResultsWrapper
 from econml.dml import CausalForestDML
@@ -32,7 +34,8 @@ class Estimator(ABC):
     """
 
     def __init__(self, treatment: tuple, treatment_values: float, control_values: float, adjustment_set: set,
-                 outcome: tuple, df: pd.DataFrame = None, effect_modifiers: dict[Variable: Any] = None):
+                 outcome: tuple, df: pd.DataFrame = None, effect_modifiers: dict[Variable: Any] = None,
+                 adjustment_set_configuration: dict[Variable: Any] = None):
         self.treatment = treatment
         self.treatment_values = treatment_values
         self.control_values = control_values
@@ -47,8 +50,22 @@ class Estimator(ABC):
             self.effect_modifiers = {k.name: v for k, v in effect_modifiers.items()}
         else:
             raise ValueError(f"Unsupported type for effect_modifiers {effect_modifiers}. Expected iterable")
+
+        if adjustment_set_configuration is None:
+            self.adjustment_set_configuration = dict()
+        elif isinstance(adjustment_set_configuration, set) or isinstance(adjustment_set_configuration, list):
+            self.adjustment_set_configuration = {k.name for k in adjustment_set_configuration}
+        elif isinstance(adjustment_set_configuration, dict):
+            self.adjustment_set_configuration = {k.name: v for k, v in adjustment_set_configuration.items()}
+        else:
+            raise ValueError(f"Unsupported type for adjustment_set_configuration {adjustment_set_configuration}. Expected iterable")
+
+        if len(adjustment_set_configuration) != 0:
+            assert {k.name for k in adjustment_set_configuration} == adjustment_set, f'{adjustment_set_configuration} must specify vars in {adjustment_set}'
+        
         self.modelling_assumptions = []
         logger.debug("Effect Modifiers: %s", self.effect_modifiers)
+        logger.debug("Effect Modifiers: %s", self.adjustment_set_configuration)
 
     @abstractmethod
     def add_modelling_assumptions(self):
@@ -82,11 +99,13 @@ class LogisticRegressionEstimator(Estimator):
     for estimating categorical outcomes.
     """
     def __init__(self, treatment: tuple, treatment_values: float, control_values: float, adjustment_set: set,
-                 outcome: tuple, df: pd.DataFrame = None, effect_modifiers: dict[Variable: Any] = None, intercept: int = 1):
-        super().__init__(treatment, treatment_values, control_values, adjustment_set, outcome, df, effect_modifiers)
+                 outcome: tuple, df: pd.DataFrame = None, effect_modifiers: dict[Variable: Any] = None, intercept: int = 1,
+                 adjustment_set_configuration: dict[Variable: Any] = None):
+        super().__init__(treatment, treatment_values, control_values, adjustment_set, outcome, df, effect_modifiers, adjustment_set_configuration)
 
         for term in self.effect_modifiers:
             self.adjustment_set.add(term)
+
 
         self.product_terms = []
         self.square_terms = []
@@ -125,6 +144,8 @@ class LogisticRegressionEstimator(Estimator):
         reduced_df = reduced_df[necessary_cols]
         logger.debug(reduced_df[necessary_cols])
 
+        print(reduced_df)
+
         # 2. Add intercept
         reduced_df['intercept'] = self.intercept
 
@@ -132,20 +153,27 @@ class LogisticRegressionEstimator(Estimator):
         cols = list(self.treatment)
         cols += [x for x in self.adjustment_set if x not in cols]
 
-        #print('treatment', reduced_df[[self.treatment[0]]].dtypes)
+        treatment_and_adjustments_cols = reduced_df[cols + ['intercept']]
 
         # Categorical data
-        #print(reduced_df[[self.treatment[0]]].dtypes.item())
 
         if(reduced_df[[self.treatment[0]]].dtypes.item() == 'object'):
             formula_string = str(self.outcome[0]) + '~C(' + str(self.treatment[0]) + ",Treatment('"+ str(self.control_values) + "'))"
             print(formula_string)
             regression = smf.logit(formula=formula_string, data=reduced_df).fit(maxiters=50)
 
-            print(regression.summary())
         else:
+            print(treatment_and_adjustments_cols)
             # regression for set of 2 data points
-            regression = sm.Logit(reduced_df[self.outcome[0]].to_numpy(), reduced_df[[self.treatment[0], 'intercept']].to_numpy()).fit(maxiters=50)
+            print(self.outcome[0])
+            adjustment_set_str = ''
+            if self.adjustment_set:
+                adjustment_set_str = str(next(iter(self.adjustment_set)))
+
+            formula_string = str(self.outcome[0]) + '~' + str(adjustment_set_str) + '+' + str(self.treatment[0])
+            regression = smf.logit(formula=formula_string, data=reduced_df).fit(maxiters=50)
+
+        print(regression.summary())
         
         return regression
 
@@ -160,9 +188,12 @@ class LogisticRegressionEstimator(Estimator):
         x = pd.DataFrame()
         x[self.treatment[0]] = [self.treatment_values, self.control_values]
 
-        x['intercept'] = self.intercept
+        for k,v in self.adjustment_set_configuration.items():
+            x[k] = v
 
-        y = model.predict(x)       
+        x['intercept'] = self.intercept
+                
+        y = model.predict(x)
         
         return y.iloc[1], y.iloc[0]
 

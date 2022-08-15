@@ -47,6 +47,7 @@ causal_specification = CausalSpecification(scenario, causal_dag)
 def test_shipment(
     observational_data_path,
     causal_test_case,
+    shipment
 ):
     # 6. Create a data collector
     data_collector = ObservationalDataCollector(scenario, observational_data_path)
@@ -72,8 +73,6 @@ def test_shipment(
             minimal_adjustment_set - {v.name for v in causal_test_case.control_input_configuration}
     minimal_adjustment_set = minimal_adjustment_set - {v.name for v in causal_test_case.outcome_variables}
 
-    print(minimal_adjustment_set)
-
     estimator = LogisticRegressionEstimator(
         treatment=[treatment],
         control_values=list(causal_test_case.control_input_configuration.values())[
@@ -83,6 +82,7 @@ def test_shipment(
             causal_test_case.treatment_input_configuration.values()
         )[0],
         adjustment_set=minimal_adjustment_set,
+        adjustment_set_configuration={k:shipment[k] for k in minimal_adjustment_set}
         outcome=[outcome],
         df=data,
     )
@@ -123,6 +123,7 @@ causal_test_case = CausalTestCase(
     treatment_input_configuration={plane_transport: 0},
     expected_causal_effect=ExactValue(4, tolerance=0.5),
     outcome_variables={alarm},
+    
     estimate_type="ate",
 )
 obs_causal_test_result = test_intensity_num_shapes(
