@@ -1,9 +1,8 @@
+import logging
 from typing import Any
 
-from causal_testing.testing.causal_test_outcome import CausalTestOutcome
 from causal_testing.specification.variable import Variable
-
-import logging
+from causal_testing.testing.causal_test_outcome import CausalTestOutcome
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +42,9 @@ class CausalTestCase:
             self.effect_modifier_configuration = effect_modifier_configuration
         else:
             self.effect_modifier_configuration = dict()
-        assert self.control_input_configuration.keys() == self.treatment_input_configuration.keys(),\
-               "Control and treatment input configurations must have the same keys."
+        assert (
+            self.control_input_configuration.keys() == self.treatment_input_configuration.keys()
+        ), "Control and treatment input configurations must have the same keys."
 
         if adjustment_set_configuration:
             self.adjustment_set_configuration = adjustment_set_configuration
@@ -70,5 +70,7 @@ class CausalTestCase:
     def __str__(self):
         treatment_config = {k.name: v for k, v in self.treatment_input_configuration.items()}
         control_config = {k.name: v for k, v in self.control_input_configuration.items()}
-        return (f"Running {treatment_config} instead of {control_config} should cause the following "
-                f"changes to {self.outcome_variables}: {self.expected_causal_effect}.")
+        return (
+            f"Running {treatment_config} instead of {control_config} should cause the following "
+            f"changes to {self.outcome_variables}: {self.expected_causal_effect}."
+        )
