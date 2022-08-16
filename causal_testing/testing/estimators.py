@@ -174,13 +174,13 @@ class LogisticRegressionEstimator(Estimator):
             if self.adjustment_set:
                 adjustment_set_str = str(next(iter(self.adjustment_set)))
 
-            print('ADJUST', adjustment_set_str)
             formula_string = str(self.outcome[0]) + '~' + str(adjustment_set_str) + '+' + str(self.treatment[0])
             print(formula_string)
             print(reduced_df)
             regression = smf.logit(formula=formula_string, data=reduced_df).fit(maxiters=50)
 
         print(regression.summary())
+
         
         return regression
 
@@ -202,7 +202,7 @@ class LogisticRegressionEstimator(Estimator):
         x['intercept'] = self.intercept
                 
         y = model.predict(x)
-              
+
         return y.iloc[1], y.iloc[0]
 
     def estimate_ate(self) -> float:

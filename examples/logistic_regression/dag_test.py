@@ -1,4 +1,3 @@
-from audioop import mul
 from causal_testing.specification.causal_dag import CausalDAG
 from causal_testing.specification.scenario import Scenario
 from causal_testing.specification.variable import Input, Output
@@ -8,8 +7,9 @@ from causal_testing.testing.causal_test_case import CausalTestCase
 from causal_testing.testing.causal_test_outcome import ExactValue, Positive
 from causal_testing.testing.causal_test_engine import CausalTestEngine
 from causal_testing.testing.estimators import Estimator, LogisticRegressionEstimator
+from causal_testing.testing.causal_test_outcome import CausalTestResult
+
 from data.improved_csv_gen import new_shipment
-import multiprocessing
 
 import pandas as pd
 import numpy as np
@@ -88,9 +88,6 @@ def test_shipment(
             minimal_adjustment_set - {v.name for v in causal_test_case.control_input_configuration}
     minimal_adjustment_set = minimal_adjustment_set - {v.name for v in causal_test_case.outcome_variables}
 
-    print(minimal_adjustment_set)
-    print(shipment)
-
     estimator = LogisticRegressionEstimator(
         treatment=[treatment],
         control_values=list(causal_test_case.control_input_configuration.values())[
@@ -99,18 +96,29 @@ def test_shipment(
         treatment_values=list(
             causal_test_case.treatment_input_configuration.values()
         )[0],
-        adjustment_set={'S3'},
+        adjustment_set=minimal_adjustment_set,
         adjustment_set_configuration={scenario.variables[k]:shipment[k][0] for k in minimal_adjustment_set},
         outcome=[outcome],
         df=data,
     )
 
     # 10. Execute the test
-    causal_test_result = causal_test_engine.execute_test(
-        estimator, causal_test_case.estimate_type
-    )
+    # causal_test_result = causal_test_engine.execute_test(
+    #     estimator, causal_test_case.estimate_type
+    # )
+    control_prediction, treatment_prediction = estimator.estimate_control_treatment()
+    # causal_test_result = CausalTestResult(
+    #     treatment=estimator.treatment,
+    #     outcome=estimator.outcome,
+    #     treatment_value=estimator.treatment_values,
+    #     control_value=estimator.control_values,
+    #     adjustment_set=estimator.adjustment_set,
+    #     ate=prediction,
+    #     effect_modifier_configuration=causal_test_case.effect_modifier_configuration,
+    #     adjustment_set_configuration=causal_test_case.adjustment_set_configuration,
+    #     confidence_intervals=confidence_interval)
 
-    return causal_test_result
+    return (control_prediction, treatment_prediction)
 
 
 def get_ate(name, control, treatment, shipment):
@@ -122,16 +130,80 @@ def get_ate(name, control, treatment, shipment):
         outcome_variables={alarm},
         estimate_type="ate",
     )
-    obs_causal_test_result = test_shipment(
+    control_prediction, treatment_prediction = test_shipment(
         observational_data_path,
         causal_test_case,
         shipment
     )
 
-    # print("Observational", end=" ")
-    # print(obs_causal_test_result)
+    return (control_prediction, treatment_prediction)
 
-    return obs_causal_test_result.ate
+def categorical_predictions(type, seen):
+    if type == 'content':
+        dict_keys = list(content_types.keys())
+    else:
+        dict_keys = list(countries.keys())
+
+    dict_keys.remove(seen)
+    remaining = list(dict_keys)
+
+    fuzzed = remaining[np.random.randint(len(remaining))]
+
+    preds = get_ate(type, seen, fuzzed, shipment_df)
+
+    predictions.append((seen, preds[0]))
+    predictions.append((fuzzed, preds[1]))
+
+    remaining.remove(fuzzed)
+
+    for fuzz in remaining:
+        predictions.append((fuzz, get_ate(type, seen, fuzz, shipment_df)[1]))
+
+    print('Predictions for ' + seen, predictions)
+
+    print('=' * 150)
+    print('Seen value: ', seen)
+
+    for val in predictions:
+        print_str = str(val[0]) + ' sets off the alarm ' + str(val[1])
+        print(print_str)
+    print(shipment_df)
+
+
+def binary_predictions(type, seen):
+    # Came on plane or ship
+
+    if seen == 1:
+        fuzzed = 0        
+    else:
+        fuzzed = 1
+
+    preds = get_ate(type, seen, fuzzed, shipment_df)
+    predictions.append((seen, preds[0]))
+    predictions.append((fuzzed, preds[1]))
+
+    for val in predictions:
+        print_str = str(type) + ' as ' + str(bool(val[0])) + ' sets off the alarm ' + str(val[1])
+        print(print_str)
+    print(shipment_df)
+
+def float_predictions(type, seen, n):
+    # Trial n different numbers
+    weight_predictions = []
+    for val in range(n):
+        fuzzed_weight = np.random.rand() * 100
+        preds = get_ate(type, seen, fuzzed_weight, shipment_df)
+
+        if len(weight_predictions) == 0:
+            weight_predictions.append((seen, preds[0]))
+            
+        predictions.append((fuzzed_weight, preds[1]))
+
+    for val in predictions:
+        print_str = str(val[0]) + ' set off the alarm ' + str(val[1])
+        print(print_str)
+    print(shipment_df)
+
 
 '''
 For each edge, get treatment and outcome. Fuzz treatment and examine effect of treatment on alarm
@@ -166,82 +238,18 @@ for fuzz_type in layer_1:
     # Get fuzz value
     seen = shipment_df[fuzz_type].to_numpy()[0]
 
-    ates = []
+    predictions = []
 
-    # Pick a different content
-    # if fuzz_type == 'content':
-
-    #     # Train model on content
-        
-    #     content_keys = list(content_types.keys())
-    #     content_keys.remove(seen)
-    #     remaining = list(content_keys)
-
-    #     fuzzed = remaining[np.random.randint(len(remaining))]
-
-    #     ates.append((fuzzed, get_ate(fuzz_type, seen, fuzzed, shipment_df)))
-
-    #     remaining.remove(fuzzed)
-
-    #     for fuzz in remaining:
-    #         ates.append((fuzz, get_ate(fuzz_type, seen, fuzz, shipment_df)))
-
-    #     print('ATES for ' + seen, ates)
-
-    #     print('=' * 150)
-    #     print('Seen value: ', seen)
-    #     for val in ates:
-    #         print_str = 'If ' + str(val[0]) +' would have come in except ' + str(seen) + ' then alarm would have gone off ' + str(val[1]) + ' more likely'
-    #         print(print_str)
-
-    # if fuzz_type == 'country':
-
-    #     # Train model on country
-        
-    #     country_keys = list(countries.keys())
-    #     country_keys.remove(seen)
-    #     remaining = list(country_keys)
-
-    #     fuzzed = remaining[np.random.randint(len(remaining))]
-
-    #     ates.append((fuzzed, get_ate(fuzz_type, seen, fuzzed, shipment_df)))
-
-    #     remaining.remove(fuzzed)
-
-    #     for fuzz in remaining:
-    #         ates.append((fuzz, get_ate(fuzz_type, seen, fuzz, shipment_df)))
-
-    #     print('ATES for ' + seen, ates)
-
-    #     print('=' * 150)
-    #     print('Seen value: ', seen)
-    #     for val in ates:
-    #         print_str = 'If shipment came in via ' + str(val[0]) +' instead of ' + str(seen) + ' then alarm would have gone off ' + str(val[1]) + ' more likely'
-    #         print(print_str)
+    # Categorical predictions
+    # if shipment_df[fuzz_type].dtypes == 'object':
+    #     categorical_predictions(fuzz_type, seen)
 
     # Non-categorical, binary only
-    # if fuzz_type == 'plane_transport':
-    #     # Came on plane
-    #     if seen == 1:
-    #         fuzz = 0
-    #         ates.append(('ship', get_ate(fuzz_type, seen, fuzz, shipment_df)))
-    #         vehicle = 'plane'
-    #     else:
-    #         fuzz = 1
-    #         ates.append(('plane', get_ate(fuzz_type, seen, fuzz, shipment_df)))
-    #         vehicle = 'ship'
-
-    #     print_str = 'If shipment came in via ' + str(ates[0][0]) +' instead of ' + vehicle+ ' then alarm would have gone off ' + str(ates[0][1]) + ' more likely'
-    #     print(print_str)
+    # if seen == 1 or seen == 0:
+    #     binary_predictions(fuzz_type, seen)
 
     # Non-categorical, float
-    # if fuzz_type == 'weight':
+    if shipment_df[fuzz_type].dtypes == 'float':
+        float_predictions(fuzz_type, seen, 10)
 
-    #     # Trial 1000 different numbers
-    #     for val in range(2):
-    #         fuzzed_weight = np.random.rand() * 100
-    #         ates.append((fuzzed_weight, get_ate(fuzz_type, seen, fuzzed_weight, shipment_df)))
-
-    #     for val in ates:
-    #         print_str = 'If shipment came in weighing ' + str(val[0]) +' instead of weighing ' + str(seen)+ ' then alarm would have gone off ' + str(val[1]) + ' more likely'
-    #         print(print_str)
+        
