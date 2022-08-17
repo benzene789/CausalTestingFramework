@@ -163,20 +163,14 @@ class LogisticRegressionEstimator(Estimator):
 
         if(reduced_df[[self.treatment[0]]].dtypes.item() == 'object'):
             formula_string = str(self.outcome[0]) + '~C(' + str(self.treatment[0]) + ",Treatment('"+ str(self.control_values) + "'))"
-            print(formula_string)
             regression = smf.logit(formula=formula_string, data=reduced_df).fit(maxiters=50)
 
         else:
-            print(treatment_and_adjustments_cols)
             # regression for set of 2 data points
-            print(self.outcome[0])
-            adjustment_set_str = ''
-            if self.adjustment_set:
-                adjustment_set_str = str(next(iter(self.adjustment_set)))
+            adjustment_set_str =  "+".join(self.adjustment_set)
 
             formula_string = str(self.outcome[0]) + '~' + str(adjustment_set_str) + '+' + str(self.treatment[0])
-            print(formula_string)
-            print(reduced_df)
+
             regression = smf.logit(formula=formula_string, data=reduced_df).fit(maxiters=50)
 
         print(regression.summary())

@@ -1,8 +1,9 @@
-from curses import panel
+from pprint import pprint
+import random
 import numpy as np
 import pandas as pd
 
-from geopy.distance import geodesic
+#from geopy.distance import geodesic
 
 # Planes and ships have a set chance of setting off S1 (ship) or S2 (ship)
 def trigger_s1_or_s2(chance: float) -> bool:    
@@ -27,7 +28,7 @@ def trigger_s3(country: str, content: str, weight: float) -> bool:
     return int(random < trigger_s3_chance)
 
 
-def trigger_alarm(s1: int, s2: int, s3: int) -> bool:
+def trigger_alarm(s1: int, s2: int, s3: int, shipment: bool, average_alarm: float) -> bool:
     s1_prob = 0.4
     s2_prob = 0.5
     s3_prob = 0.7
@@ -35,12 +36,17 @@ def trigger_alarm(s1: int, s2: int, s3: int) -> bool:
     random = np.random.rand()
 
     trigger_alarm_chance = ((s1_prob * s1) + (s2_prob * s2) + (s3_prob * s3)) / (s1_prob + s2_prob + s3_prob)
-    
-    return int(random < trigger_alarm_chance)
+
+    if(shipment):
+        return int(trigger_alarm_chance > average_alarm)
+    else:
+        return int(random < trigger_alarm_chance)
+        
 
 
-def new_shipment():
-    
+def new_shipment(shipment: bool, average_alarm: float) -> None:
+    np.random.seed(random.randint(0, 50000))
+
     df_row = []
 
     s1_triggered = 0
@@ -51,27 +57,22 @@ def new_shipment():
     # plane or ship
     plane = np.random.randint(0,2)
 
-    # Planes have 50% chance, ship has 50%
+    # Planes have 40% chance, ship has 60%
     if plane:
-        s1_triggered = trigger_s1_or_s2(0.5)
+        s1_triggered = trigger_s1_or_s2(0.4)
     else:
-        s2_triggered = trigger_s1_or_s2(0.5)
+        s2_triggered = trigger_s1_or_s2(0.6)
 
     country_pick = int(np.random.randint(0, 3))
     country_key = list(countries.keys())[country_pick]
 
-    content_pick = int(np.random.randint(0, 3))
+    content_pick = int(np.random.randint(0, 4))
     content_key = list(content_types.keys())[content_pick]
     weight = np.random.rand() * 100
 
     s3_triggered = trigger_s3(country_key, content_key, weight)
 
-    alarm_triggered = trigger_alarm(s1_triggered, s2_triggered, s3_triggered)
-
-    if alarm_triggered > 0.4:
-        alarm_triggered = 1
-    else:
-        alarm_triggered = 0
+    alarm_triggered = trigger_alarm(s1_triggered, s2_triggered, s3_triggered, shipment, average_alarm)
 
     # Sort out rows of df
 
@@ -87,15 +88,16 @@ def new_shipment():
     return df_row
 
 
-df_rows = []
-for row in range(10000):
+# df_rows = []
+# for row in range(10000):    
 
-    df_row = new_shipment()
+#     df_row = new_shipment(False, 0)
     
-    df_rows.append(df_row)
+#     df_rows.append(df_row)
 
-df = pd.DataFrame(df_rows, columns=['country', 'plane_transport', 'content', 'weight', 'S1', 'S2', 'S3', 'alarm'])
 
-df.to_csv('new_test.csv')
+# df = pd.DataFrame(df_rows, columns=['country', 'plane_transport', 'content', 'weight', 'S1', 'S2', 'S3', 'alarm'])
 
-print('DONE!')
+# df.to_csv('b.csv')
+
+# print('DONE!')

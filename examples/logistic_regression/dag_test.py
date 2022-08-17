@@ -57,7 +57,7 @@ scenario = Scenario(
 # 4. Construct a causal specification from the scenario and causal DAG
 causal_specification = CausalSpecification(scenario, causal_dag)
 
-observational_data_path = 'data/new_test.csv'
+observational_data_path = 'data/b.csv'
 
 def test_shipment(
     observational_data_path,
@@ -191,24 +191,58 @@ def float_predictions(type, seen, n):
     # Trial n different numbers
     weight_predictions = []
     for val in range(n):
-        fuzzed_weight = np.random.rand() * 100
+        fuzzed_weight = np.random.uniform(seen, 100.0)
         preds = get_ate(type, seen, fuzzed_weight, shipment_df)
 
         if len(weight_predictions) == 0:
             weight_predictions.append((seen, preds[0]))
             
-        predictions.append((fuzzed_weight, preds[1]))
+        weight_predictions.append((fuzzed_weight, preds[1]))
 
-    for val in predictions:
+    for val in weight_predictions:
         print_str = str(val[0]) + ' set off the alarm ' + str(val[1])
         print(print_str)
     print(shipment_df)
 
+    return weight_predictions
+
+
+def distance_metric_float(float_predictions: list, min_alarm_chance: float):
+    # Split into two lists, above and below threshold
+
+    print(float_predictions)
+    above = [a for a in float_predictions if a[1] > min_alarm_chance]
+    below = [b for b in float_predictions if b[1] < min_alarm_chance]
+
+    print('ABOVE', above)
+    print('BELOW', below)
+    print(min_alarm_chance)
+
+    if len(below) != 0:
+        max_threshold_below = max(below,key=lambda c:c[1])
+    else:
+        max_threshold_below = (None, min_alarm_chance)
+    
+    if len(above) != 0:
+        min_threshold_above = min(above,key=lambda d:d[1])
+    else:
+        min_threshold_above = (None, min_alarm_chance)
+
+
+    print('MTB', max_threshold_below)
+    print('MTA', min_threshold_above)
+
+    print('=' * 150)
+    print('DISTANCE METRIC FOR WEIGHT')
+
+    print('Need to change weight by ' + str(min_threshold_above[0]) + ' from ' + str(max_threshold_below[0]))
+
+    print('This effects the alarm from ' + str(max_threshold_below[1]) + ' to ' + str(min_threshold_above[1]))
+        
 
 '''
 For each edge, get treatment and outcome. Fuzz treatment and examine effect of treatment on alarm
 Calculate if change in alarm, if there is calculate distance from original value
-
 '''
 
 # Get all edges
@@ -227,14 +261,18 @@ layer_1 = [dag_edge for dag_edge in edges if 'S'.upper() not in dag_edge]
 sensor_layer = list(set(edges) - set(layer_1))
 outcome = [outcome]
 
-# Now we generate a mock row of the csv
+# New shipment coming in
 
-shipment = new_shipment()
+read_csv = pd.read_csv(observational_data_path)
+
+average_alarm_chance = read_csv['alarm'].sum()/len(read_csv)
+
+shipment = new_shipment(True, average_alarm_chance)
 shipment_df =  pd.DataFrame([shipment], columns=['country', 'plane_transport', 'content', 'weight', 'S1', 'S2', 'S3', 'alarm'])
 print(shipment_df)
+
 # Fuzz the different nodes in outer layer
 for fuzz_type in layer_1:
-    print(fuzz_type)
     # Get fuzz value
     seen = shipment_df[fuzz_type].to_numpy()[0]
 
@@ -245,11 +283,13 @@ for fuzz_type in layer_1:
     #     categorical_predictions(fuzz_type, seen)
 
     # Non-categorical, binary only
-    # if seen == 1 or seen == 0:
+    # elif seen == 1 or seen == 0:
     #     binary_predictions(fuzz_type, seen)
 
     # Non-categorical, float
     if shipment_df[fuzz_type].dtypes == 'float':
-        float_predictions(fuzz_type, seen, 10)
+        weight_predictions = float_predictions(fuzz_type, seen, 5)
+        distance_metric_float(weight_predictions, average_alarm_chance)
 
-        
+    
+print('Alarm will trigger when above', average_alarm_chance)
