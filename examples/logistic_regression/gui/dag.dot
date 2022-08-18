@@ -1,0 +1,14 @@
+digraph nuclear_detection {
+    rankdir=LR;
+    content -> S1;
+    content -> S2;
+    content -> S3;
+    country -> S1;
+    country -> S2;
+    country -> S3;
+    plane -> S1;
+    ship -> S2;
+    S1 -> alarm;
+    S2 -> alarm;
+    S3 -> alarm;
+}

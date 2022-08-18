@@ -9,11 +9,15 @@ from causal_testing.testing.causal_test_engine import CausalTestEngine
 from causal_testing.testing.estimators import Estimator, LogisticRegressionEstimator
 from causal_testing.testing.causal_test_outcome import CausalTestResult
 
+from gui import *
+
 from data.improved_csv_gen import new_shipment
 
 import pandas as pd
 import numpy as np
 import random
+
+from gui.dot_converter import DotConverter
 
 np.random.seed(random.randint(0, 50000))
 
@@ -139,6 +143,9 @@ def get_ate(name, control, treatment, shipment):
     return (control_prediction, treatment_prediction)
 
 def categorical_predictions(type, seen):
+
+    c_prediction_list = []
+
     if type == 'content':
         dict_keys = list(content_types.keys())
     else:
@@ -151,27 +158,32 @@ def categorical_predictions(type, seen):
 
     preds = get_ate(type, seen, fuzzed, shipment_df)
 
-    predictions.append((seen, preds[0]))
-    predictions.append((fuzzed, preds[1]))
+    c_prediction_list.append((seen, preds[0]))
+    c_prediction_list.append((fuzzed, preds[1]))
 
     remaining.remove(fuzzed)
 
     for fuzz in remaining:
-        predictions.append((fuzz, get_ate(type, seen, fuzz, shipment_df)[1]))
+        c_prediction_list.append((fuzz, get_ate(type, seen, fuzz, shipment_df)[1]))
 
-    print('Predictions for ' + seen, predictions)
+    print('Predictions for ' + seen, c_prediction_list)
 
     print('=' * 150)
     print('Seen value: ', seen)
 
-    for val in predictions:
+    for val in c_prediction_list:
         print_str = str(val[0]) + ' sets off the alarm ' + str(val[1])
-        print(print_str)
+
+    print(print_str)
     print(shipment_df)
+
+    return c_prediction_list
 
 
 def binary_predictions(type, seen):
     # Came on plane or ship
+
+    binary_preds = []
 
     if seen == 1:
         fuzzed = 0        
@@ -179,19 +191,24 @@ def binary_predictions(type, seen):
         fuzzed = 1
 
     preds = get_ate(type, seen, fuzzed, shipment_df)
-    predictions.append((seen, preds[0]))
-    predictions.append((fuzzed, preds[1]))
+    binary_preds.append((seen, preds[0]))
+    binary_preds.append((fuzzed, preds[1]))
 
-    for val in predictions:
+    for val in binary_preds:
         print_str = str(type) + ' as ' + str(bool(val[0])) + ' sets off the alarm ' + str(val[1])
-        print(print_str)
+
+    print(print_str)
     print(shipment_df)
+
+    print(binary_preds)
+
+    return binary_preds
 
 def float_predictions(type, seen, n):
     # Trial n different numbers
     weight_predictions = []
     for val in range(n):
-        fuzzed_weight = np.random.uniform(seen, 100.0)
+        fuzzed_weight = np.random.uniform(0, 100.0)
         preds = get_ate(type, seen, fuzzed_weight, shipment_df)
 
         if len(weight_predictions) == 0:
@@ -206,17 +223,9 @@ def float_predictions(type, seen, n):
 
     return weight_predictions
 
-
-def distance_metric_float(float_predictions: list, min_alarm_chance: float):
-    # Split into two lists, above and below threshold
-
-    print(float_predictions)
-    above = [a for a in float_predictions if a[1] > min_alarm_chance]
-    below = [b for b in float_predictions if b[1] < min_alarm_chance]
-
-    print('ABOVE', above)
-    print('BELOW', below)
-    print(min_alarm_chance)
+def calc_threshold_vals(preds: list, min_alarm_chance: float):
+    above = [a for a in preds if a[1] > min_alarm_chance]
+    below = [b for b in preds if b[1] < min_alarm_chance]
 
     if len(below) != 0:
         max_threshold_below = max(below,key=lambda c:c[1])
@@ -228,17 +237,91 @@ def distance_metric_float(float_predictions: list, min_alarm_chance: float):
     else:
         min_threshold_above = (None, min_alarm_chance)
 
+    return (max_threshold_below, min_threshold_above)
 
-    print('MTB', max_threshold_below)
-    print('MTA', min_threshold_above)
+def distance_metric_float(float_predictions: list, min_alarm_chance: float, seen):
+    # Split into two lists, above and below threshold
+
+    max_threshold_below, min_threshold_above = calc_threshold_vals(float_predictions, min_alarm_chance)
+
+    float_predictions = dict(float_predictions)
+
+    float_distance = 0
 
     print('=' * 150)
     print('DISTANCE METRIC FOR WEIGHT')
 
-    print('Need to change weight by ' + str(min_threshold_above[0]) + ' from ' + str(max_threshold_below[0]))
+    if seen > max_threshold_below[0]:
+        print('Need to change weight to ' + str(max_threshold_below[0]) + ' from ' + str(seen))
 
-    print('This effects the alarm from ' + str(max_threshold_below[1]) + ' to ' + str(min_threshold_above[1]))
-        
+        print('This effects the alarm from ' + str(float_predictions[seen]) + ' to ' + str(max_threshold_below[1]))
+
+        print('This is an increase of ' + str(seen - max_threshold_below[0]))
+
+        float_distance = float_predictions[seen] - max_threshold_below[1]
+    
+    elif seen < min_threshold_above[0]:
+
+        print('Need to change weight to ' + str(min_threshold_above[0]) + ' from ' + str(seen))
+
+        print('This effects the alarm from ' + str(float_predictions[seen]) + ' to ' + str(min_threshold_above[1]))
+
+        print('This is an increase of ' + str(min_threshold_above[0] - seen))
+
+        float_distance = min_threshold_above[1] - float_predictions[seen]
+
+    return float_distance
+
+
+def distance_metric_categorical(c_prediction_list: list, min_alarm_chance: float, seen):
+    # Get all categorical predictions
+    # Keep threshold in mind (min_alarm_chance). 
+    # Find out what which categories for that shipment will cause the alarm to go trigger and not trigger
+    # Find the min and max of the boundary between alarm triggering
+    # This is the distance metric
+
+    category_distance = 0
+
+    max_threshold_below, min_threshold_above = calc_threshold_vals(c_prediction_list, min_alarm_chance)
+
+    cat_predictions = {k: v for k, v in sorted(dict(c_prediction_list).items(), key=lambda item: item[1])}
+
+    print(cat_predictions)
+
+    if cat_predictions[seen] > max_threshold_below[1]:
+        print('Need to change category to ' + str(max_threshold_below[0]) + ' from ' + str(seen))
+
+        print('This effects the alarm from ' + str(cat_predictions[seen]) + ' to ' + str(max_threshold_below[1]))
+
+        category_distance = cat_predictions[seen] - max_threshold_below[1]
+
+    elif cat_predictions[seen] < min_threshold_above[1]:
+
+        print('Need to change category to ' + str(min_threshold_above[0]) + ' from ' + str(seen))
+
+        print('This effects the alarm from ' + str(cat_predictions[seen]) + ' to ' + str(min_threshold_above[1]))
+
+        category_distance = min_threshold_above[1] - cat_predictions[seen]
+
+    return category_distance
+
+def distance_metric_binary(b_prediction_list: list, min_alarm_chance: float, seen):
+
+    binary_dist = 0
+
+    b_prediction_dict = dict(b_prediction_list)
+
+    if seen == 1:
+        key = 0
+    else:
+        key = 1
+
+    if b_prediction_dict[seen] > b_prediction_dict[key]:
+        binary_dist = b_prediction_dict[seen] - b_prediction_dict[key]
+    else:
+        binary_dist = b_prediction_dict[key] - b_prediction_dict[seen]
+    
+    return binary_dist
 
 '''
 For each edge, get treatment and outcome. Fuzz treatment and examine effect of treatment on alarm
@@ -272,24 +355,39 @@ shipment_df =  pd.DataFrame([shipment], columns=['country', 'plane_transport', '
 print(shipment_df)
 
 # Fuzz the different nodes in outer layer
+distances = [] 
 for fuzz_type in layer_1:
     # Get fuzz value
     seen = shipment_df[fuzz_type].to_numpy()[0]
 
-    predictions = []
-
     # Categorical predictions
-    # if shipment_df[fuzz_type].dtypes == 'object':
-    #     categorical_predictions(fuzz_type, seen)
+    if shipment_df[fuzz_type].dtypes == 'object':
+        c_prediction_list = categorical_predictions(fuzz_type, seen)
+        distances.append((fuzz_type, distance_metric_categorical(c_prediction_list, average_alarm_chance, seen)))
 
     # Non-categorical, binary only
-    # elif seen == 1 or seen == 0:
-    #     binary_predictions(fuzz_type, seen)
+    if seen == 1 or seen == 0:
+        b_prediction_list = binary_predictions(fuzz_type, seen)
+        print(b_prediction_list)
+        distances.append((fuzz_type, distance_metric_binary(b_prediction_list, average_alarm_chance, seen), fuzz_type))
 
     # Non-categorical, float
-    if shipment_df[fuzz_type].dtypes == 'float':
-        weight_predictions = float_predictions(fuzz_type, seen, 5)
-        distance_metric_float(weight_predictions, average_alarm_chance)
+    elif shipment_df[fuzz_type].dtypes == 'float':
+        weight_predictions = float_predictions(fuzz_type, seen, 10)
+        distances.append((fuzz_type, distance_metric_float(weight_predictions, average_alarm_chance, seen), fuzz_type))
 
-    
-print('Alarm will trigger when above', average_alarm_chance)
+print('Alarm has a high chance of triggering when above', average_alarm_chance)
+
+print(distances)
+ordered = {k: v for k, v in sorted(dict(distances).items(), key=lambda item: item[1])}
+
+print('ORDERED EDGES')
+
+print('=' * 150)
+
+print(ordered)
+
+# GUI HERE
+graph = DotConverter()
+
+graph.create_graph()
