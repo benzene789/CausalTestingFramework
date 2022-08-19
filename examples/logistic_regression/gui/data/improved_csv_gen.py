@@ -29,8 +29,8 @@ def trigger_s3(country: str, content: str, weight: float) -> bool:
 
 
 def trigger_alarm(s1: int, s2: int, s3: int, shipment: bool, average_alarm: float) -> bool:
-    s1_prob = 0.4
-    s2_prob = 0.5
+    s1_prob = 0.45
+    s2_prob = 0.55
     s3_prob = 0.7
 
     random = np.random.rand()
@@ -42,7 +42,6 @@ def trigger_alarm(s1: int, s2: int, s3: int, shipment: bool, average_alarm: floa
     else:
         return int(random < trigger_alarm_chance)
         
-
 
 def new_shipment(shipment: bool, average_alarm: float) -> None:
     np.random.seed(random.randint(0, 50000))
@@ -59,9 +58,9 @@ def new_shipment(shipment: bool, average_alarm: float) -> None:
 
     # Planes have 40% chance, ship has 60%
     if plane:
-        s1_triggered = trigger_s1_or_s2(0.4)
+        s1_triggered = trigger_s1_or_s2(0.6)
     else:
-        s2_triggered = trigger_s1_or_s2(0.6)
+        s2_triggered = trigger_s1_or_s2(0.4)
 
     country_pick = int(np.random.randint(0, 3))
     country_key = list(countries.keys())[country_pick]
