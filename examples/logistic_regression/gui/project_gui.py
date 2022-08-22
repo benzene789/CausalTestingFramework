@@ -6,12 +6,14 @@ from dag_test import order_edge_predictions
 
 ordered_edges = order_edge_predictions()
 
+#ordered_edges = {'content': 0.01879569949683063, 'country': 0.05132754239279308, 'plane_transport': 0.08514658977367168, 'weight': 0.09630454351271467, 'S1': 0.267426944694903, 'S2': 0.3230419397194918, 'S3': 0.42156159338025667}
+
 # Get necessary graph data
 graph_data = DotConverter()
 
 graph_data.create_graph("./dag.dot")
 
-graph_data.set_edge_colours(ordered_edges, 6)
+graph_data.set_edge_colours(ordered_edges)
 
 edges = graph_data.get_graph()
 
@@ -45,9 +47,9 @@ img = PhotoImage(file="output.png")
 canvas.create_image(20,20, anchor=NW, image=img)      
 
 heading = Label(text='Edge ranking')
-red_key = Label(text='Red = High Significance')
-amber_key = Label(text='Amber = Moderate Significance')
-green_key = Label(text='Green = Minor Significance')
+red_key = Label(text='Red = High Contribution')
+amber_key = Label(text='Amber = Moderate Contribution')
+green_key = Label(text='Green = Minor Contribution')
 
 # Edge text
 y_pos = 160

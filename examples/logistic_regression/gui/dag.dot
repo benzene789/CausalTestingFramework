@@ -8,5 +8,4 @@ digraph nuclear_detection {
     plane_transport -> S2;
     S1 -> alarm;
     S2 -> alarm;
-    S3 -> alarm;
-}
+    S3 -> alarm;}

@@ -1,9 +1,6 @@
-from pprint import pprint
 import random
 import numpy as np
 import pandas as pd
-
-#from geopy.distance import geodesic
 
 # Planes and ships have a set chance of setting off S1 (ship) or S2 (ship)
 def trigger_s1_or_s2(chance: float) -> bool:    
@@ -87,16 +84,18 @@ def new_shipment(shipment: bool, average_alarm: float) -> None:
     return df_row
 
 
-# df_rows = []
-# for row in range(10000):    
+def create_csv():
 
-#     df_row = new_shipment(False, 0)
-    
-#     df_rows.append(df_row)
+    df_rows = []
+    for row in range(10000):    
+
+        df_row = new_shipment(False, 0)
+        
+        df_rows.append(df_row)
 
 
-# df = pd.DataFrame(df_rows, columns=['country', 'plane_transport', 'content', 'weight', 'S1', 'S2', 'S3', 'alarm'])
+    df = pd.DataFrame(df_rows, columns=['country', 'plane_transport', 'content', 'weight', 'S1', 'S2', 'S3', 'alarm'])
 
-# df.to_csv('b.csv')
+    df.to_csv('b.csv')
 
-# print('DONE!')
+    print('DONE!')

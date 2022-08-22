@@ -1,0 +1,12 @@
+digraph dag_2 {
+    rankdir=LR;
+    delivery_type -> length;
+    delivery_type -> S1;
+    delivery_type -> S2;
+    delivery_type -> S3;
+    length -> S2;
+    location -> S1;
+    location -> S2;
+    S1 -> trigger;
+    S2 -> trigger;
+    S3 -> trigger;}

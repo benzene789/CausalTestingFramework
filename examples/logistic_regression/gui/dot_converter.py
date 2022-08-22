@@ -1,6 +1,3 @@
-import networkx as nx
-from networkx.drawing.nx_agraph import read_dot
-
 import pydot
 
 class DotConverter:
@@ -14,15 +11,13 @@ class DotConverter:
 
         self.graph = graphs[0]
 
-        # self.graph.get_edges()[1].set_color('blue')
-        # self.graph.get_edges()[2].set_color('red')
-        # self.graph.get_edges()[3].set_color('green')
-        # self.graph.get_edges()[4].set_color('yellow')
+        self.graph.set_bgcolor("antiquewhite")
+
 
     def get_graph(self):
         return self.graph
 
-    def set_edge_colours(self, edges, layer_1_size):
+    def set_edge_colours(self, edges):
         # RED EDGES: 0-.3
         # YELLOW EDGES: .3 - .6
         # GREEN EDGES 0.6 - 1
@@ -46,29 +41,11 @@ class DotConverter:
                         colour_map.append('yellow')
                     elif edges[ordered] > 0.06:
                         colour_map.append('green')
-                    print(colour_map)
 
         # Now colour the edges
-        for e in range(0, layer_1_size):
-            print(e)
-            print(self.graph.get_edges()[e])
-            print(colour_map[e])
-            self.graph.get_edges()[e].set_color(colour_map[e])
+        for c in range(0, len(self.graph.get_edges())):
+            self.graph.get_edges()[c].set_color(colour_map[c])
             
-        print(self.graph)
-    
     def write_png(self):
+
         self.graph.write_png("output.png")
-
-
-''' PLAN
-
-Data set comes in, this module will work with the causality module that will work on data/ ranks causes
-
-Rank the causes that set off the alarm
-
-Red = most problematic, yellow = slight concern, green = not so much
-
-create image and export to GUI
-
-'''

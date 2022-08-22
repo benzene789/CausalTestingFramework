@@ -330,17 +330,7 @@ Calculate if change in alarm, if there is calculate distance from original value
 def collect_shipment():
 
     # Get all edges
-    edges = []
-    for edge in causal_dag.graph:
-        edges.append(edge)
-
-    # alarm
-    outcome = edges[len(causal_dag.graph)-1]
-
-    edges.remove(outcome)
-    # Separate out layers of DAG into separate lists
-
-    layer_1 = [dag_edge for dag_edge in edges if 'S'.upper() not in dag_edge]
+    edges = [dag_edge for dag_edge in causal_dag.graph if 'alarm' not in dag_edge]
 
     # New shipment coming in
 
@@ -353,17 +343,21 @@ def collect_shipment():
     shipment_df =  pd.DataFrame([shipment], columns=['country', 'plane_transport', 'content', 'weight', 'S1', 'S2', 'S3', 'alarm'])
     print(shipment_df)
 
-    return shipment_df, average_alarm_chance, layer_1
+    print(edges)
+    return shipment_df, average_alarm_chance, edges
 
 
 def order_edge_predictions():
 
-    shipment_df, average_alarm_chance, layer_1 = collect_shipment()
+    WEIGHT_FUZZ_AMOUNT = 10
+
+    shipment_df, average_alarm_chance, edges = collect_shipment()
 
     print('Alarm has a high chance of triggering when above', average_alarm_chance)
     # Fuzz the different nodes in outer layer
     distances = [] 
-    for fuzz_type in layer_1:
+    for fuzz_type in edges:
+        print(fuzz_type)
         # Get fuzz value
         seen = shipment_df[fuzz_type].to_numpy()[0]
 
@@ -380,7 +374,7 @@ def order_edge_predictions():
 
         # Non-categorical, float
         elif shipment_df[fuzz_type].dtypes == 'float':
-            weight_predictions = float_predictions(fuzz_type, seen, 10, shipment_df)
+            weight_predictions = float_predictions(fuzz_type, seen, WEIGHT_FUZZ_AMOUNT, shipment_df)
             distances.append((fuzz_type, distance_metric_float(weight_predictions, average_alarm_chance, seen)))
 
 
