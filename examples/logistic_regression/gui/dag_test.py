@@ -1,3 +1,4 @@
+
 from causal_testing.specification.causal_dag import CausalDAG
 from causal_testing.specification.scenario import Scenario
 from causal_testing.specification.variable import Input, Output
@@ -9,55 +10,46 @@ from causal_testing.testing.causal_test_engine import CausalTestEngine
 from causal_testing.testing.estimators import Estimator, LogisticRegressionEstimator
 from causal_testing.testing.causal_test_outcome import CausalTestResult
 
-from data.improved_csv_gen import new_shipment
+#from data.improved_csv_gen import new_shipment
+
+from data.improved_2 import new_shipment
 
 import pandas as pd
 import numpy as np
 import random
+import sys
 
 np.random.seed(random.randint(0, 50000))
 
-content_types = {'tiles': 0.65,
-                 'electrical': 0.25,
-                 'wood': 0.45,
-                 'banana': 0.90}
+types = {
+        np.dtype("float64"): float,
+        np.dtype("int64"): int,
+        np.dtype("object"): str,
+        pd.Int64Dtype(): int,
+    }
 
-countries = {'China': 0.25,
-             'France': 0.60,
-             'Russia': 0.90}
+DAG_FILE = sys.argv[1]
+
+observational_data_path = sys.argv[2]
+
+data = pd.read_csv(observational_data_path)
+data = data.loc[:, ~data.columns.str.contains('^Unnamed')]
 
 # 1. Read in the Causal DAG
-causal_dag = CausalDAG("./dag.dot")
+causal_dag = CausalDAG(DAG_FILE)
 
 # 2. Create variables
-plane_transport = Input("plane_transport", bool)
-country = Input("country", str)
-content = Input('content', str)
-weight = Input('weight', float)
-s1 = Input("S1", bool)
-s2 = Input("S2", bool)
-s3 = Input("S3", bool)
-
-alarm = Output("alarm", bool)
+vars = set()
+for col in data.columns:
+    data_type = types[data.dtypes[col]]
+    dag_var = Input(col, data_type)
+    vars.add(dag_var)
 
 # 3. Create scenario by applying constraints over a subset of the input variables
-scenario = Scenario(
-    variables={
-        plane_transport,
-        country,
-        content,
-        weight,
-        s1,
-        s2,
-        s3,
-        alarm,
-    }
-)
+scenario = Scenario(variables=vars)
 
 # 4. Construct a causal specification from the scenario and causal DAG
 causal_specification = CausalSpecification(scenario, causal_dag)
-
-observational_data_path = 'data/b.csv'
 
 def test_shipment(
     observational_data_path,
@@ -75,8 +67,8 @@ def test_shipment(
     # 8. Obtain the minimal adjustment set for the causal test case from the causal DAG
     causal_test_engine.load_data(index_col=0)
 
-    # 9. Set up an estimator
-    data = pd.read_csv(observational_data_path)
+    # # 9. Set up an estimator
+    # data = pd.read_csv(observational_data_path)
 
     treatment = list(causal_test_case.control_input_configuration)[0].name
     outcome = list(causal_test_case.outcome_variables)[0].name
@@ -103,20 +95,7 @@ def test_shipment(
     )
 
     # 10. Execute the test
-    # causal_test_result = causal_test_engine.execute_test(
-    #     estimator, causal_test_case.estimate_type
-    # )
     control_prediction, treatment_prediction = estimator.estimate_control_treatment()
-    # causal_test_result = CausalTestResult(
-    #     treatment=estimator.treatment,
-    #     outcome=estimator.outcome,
-    #     treatment_value=estimator.treatment_values,
-    #     control_value=estimator.control_values,
-    #     adjustment_set=estimator.adjustment_set,
-    #     ate=prediction,
-    #     effect_modifier_configuration=causal_test_case.effect_modifier_configuration,
-    #     adjustment_set_configuration=causal_test_case.adjustment_set_configuration,
-    #     confidence_intervals=confidence_interval)
 
     return (control_prediction, treatment_prediction)
 
@@ -127,7 +106,7 @@ def get_ate(name, control, treatment, shipment):
         control_input_configuration={scenario.variables[name]: control},
         treatment_input_configuration={scenario.variables[name]: treatment},
         expected_causal_effect=ExactValue(4, tolerance=0.5),
-        outcome_variables={alarm},
+        outcome_variables={scenario.variables[sys.argv[3]]},
         estimate_type="ate",
     )
     control_prediction, treatment_prediction = test_shipment(
@@ -142,24 +121,24 @@ def categorical_predictions(type, seen, shipment_df):
 
     c_prediction_list = []
 
-    if type == 'content':
-        dict_keys = list(content_types.keys())
-    else:
-        dict_keys = list(countries.keys())
+    # For getting unique column/category values in column of 'type' variable
+    data = pd.read_csv(observational_data_path)
 
-    dict_keys.remove(seen)
-    remaining = list(dict_keys)
+    unique_vals = list(data[type].unique())
+   
+    unique_vals.remove(seen)
 
-    fuzzed = remaining[np.random.randint(len(remaining))]
+    fuzzed = unique_vals[np.random.randint(len(unique_vals))]
 
+    # Get the predicted values for the seen shipment location and a random fuzz
     preds = get_ate(type, seen, fuzzed, shipment_df)
-
     c_prediction_list.append((seen, preds[0]))
     c_prediction_list.append((fuzzed, preds[1]))
 
-    remaining.remove(fuzzed)
+    # Remove and fuzz the rest
+    unique_vals.remove(fuzzed)
 
-    for fuzz in remaining:
+    for fuzz in unique_vals:
         c_prediction_list.append((fuzz, get_ate(type, seen, fuzz, shipment_df)[1]))
 
     print('Predictions for ' + seen, c_prediction_list)
@@ -170,7 +149,7 @@ def categorical_predictions(type, seen, shipment_df):
     for val in c_prediction_list:
         print_str = str(val[0]) + ' sets off the alarm ' + str(val[1])
 
-    print(print_str)
+        print(print_str)
     print(shipment_df)
 
     return c_prediction_list
@@ -330,17 +309,16 @@ Calculate if change in alarm, if there is calculate distance from original value
 def collect_shipment():
 
     # Get all edges
-    edges = [dag_edge for dag_edge in causal_dag.graph if 'alarm' not in dag_edge]
+    edges = [dag_edge for dag_edge in causal_dag.graph if sys.argv[3] not in dag_edge]
 
     # New shipment coming in
 
-    read_csv = pd.read_csv(observational_data_path)
-
     # Average alarm chance in the trained DateFrame
-    average_alarm_chance = read_csv['alarm'].sum()/len(read_csv)
+    average_alarm_chance = data[sys.argv[3]].sum()/len(data)
 
     shipment = new_shipment(True, average_alarm_chance)
-    shipment_df =  pd.DataFrame([shipment], columns=['country', 'plane_transport', 'content', 'weight', 'S1', 'S2', 'S3', 'alarm'])
+
+    shipment_df =  pd.DataFrame([shipment], columns=sys.argv[4:])
     print(shipment_df)
 
     print(edges)
@@ -349,7 +327,7 @@ def collect_shipment():
 
 def order_edge_predictions():
 
-    WEIGHT_FUZZ_AMOUNT = 10
+    FLOAT_FUZZ_AMOUNT = 10
 
     shipment_df, average_alarm_chance, edges = collect_shipment()
 
@@ -367,16 +345,15 @@ def order_edge_predictions():
             distances.append((fuzz_type, distance_metric_categorical(c_prediction_list, average_alarm_chance, seen)))
 
         # Non-categorical, binary only
-        if seen == 1 or seen == 0:
+        elif seen == 1 or seen == 0:
             b_prediction_list = binary_predictions(fuzz_type, seen, shipment_df)
             print(b_prediction_list)
             distances.append((fuzz_type, distance_metric_binary(b_prediction_list, average_alarm_chance, seen)))
 
         # Non-categorical, float
         elif shipment_df[fuzz_type].dtypes == 'float':
-            weight_predictions = float_predictions(fuzz_type, seen, WEIGHT_FUZZ_AMOUNT, shipment_df)
+            weight_predictions = float_predictions(fuzz_type, seen, FLOAT_FUZZ_AMOUNT, shipment_df)
             distances.append((fuzz_type, distance_metric_float(weight_predictions, average_alarm_chance, seen)))
-
 
     print(distances)
     ordered = {k: v for k, v in sorted(dict(distances).items(), key=lambda item: item[1])}
@@ -388,4 +365,3 @@ def order_edge_predictions():
     print(ordered)
 
     return ordered
-

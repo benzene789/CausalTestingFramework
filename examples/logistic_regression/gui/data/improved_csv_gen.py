@@ -2,10 +2,6 @@ import random
 import numpy as np
 import pandas as pd
 
-# Planes and ships have a set chance of setting off S1 (ship) or S2 (ship)
-def trigger_s1_or_s2(chance: float) -> bool:    
-    return int(np.random.uniform() > chance)
-
 content_types = {'tiles': 0.65,
                  'electrical': 0.25,
                  'wood': 0.45,
@@ -14,6 +10,11 @@ content_types = {'tiles': 0.65,
 countries = {'China': 0.25,
              'France': 0.60,
              'Russia': 0.90}
+
+# Planes and ships have a set chance of setting off S1 (ship) or S2 (ship)
+def trigger_s1_or_s2(chance: float) -> bool:    
+    return int(np.random.uniform() > chance)
+
 
 # Both country and content contribute to S3
 def trigger_s3(country: str, content: str, weight: float) -> bool:

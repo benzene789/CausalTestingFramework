@@ -3,11 +3,12 @@ import numpy as np
 import pandas as pd
 
 location = {'Spain': 0.15,
-             'Brazil': 0.7,
-             'Cuba': 0.8}
+             'Brazil': 0.5,
+             'Cuba': 0.8,
+             'Mexico':0.3}
 
 def trigger_s1(loc: int, delivery_chance: int):
-    loc_coef = 0.6
+    loc_coef = 0.1
 
     trigger_s1_chance = (loc_coef * loc) + delivery_chance
 
@@ -18,10 +19,9 @@ def trigger_s1(loc: int, delivery_chance: int):
 
 # Location, delivery type and length contribute to S2
 def trigger_s2(loc: int, delivery_type: int, length: float) -> bool:
-    loc_coef = 0.6
-    length_coef = 0.3
+    loc_coef = 0.1
 
-    trigger_s2_chance = (loc_coef * loc) + delivery_type + (length_coef * (length/100))/3
+    trigger_s2_chance = ((loc_coef * loc) + delivery_type + length/100)/3
 
     random = np.random.rand()
 
@@ -60,7 +60,7 @@ def new_shipment(shipment: bool, average_alarm: float) -> None:
     delivery_type = np.random.randint(0,2)
 
     # Delivery location of origin
-    delivery_location = list((location.keys()))[int(np.random.randint(0, 3))]
+    delivery_location = list((location.keys()))[int(np.random.randint(0, 4))]
     delivery_chance = location[delivery_location]
 
 
@@ -94,7 +94,7 @@ def new_shipment(shipment: bool, average_alarm: float) -> None:
 
 
 def create_csv():
-    columns = ['delivery_location', 'delivery_type', 'length', 'S1', 'S2', 'S3', 'alarm']
+    columns = ['delivery_location', 'delivery_type', 'length', 'S1', 'S2', 'S3', 'trigger']
 
     df_row = new_shipment(False, 0)
     df_rows = []
@@ -111,4 +111,4 @@ def create_csv():
 
     print('DONE!')
 
-create_csv()
+#create_csv()

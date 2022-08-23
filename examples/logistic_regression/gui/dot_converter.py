@@ -25,21 +25,22 @@ class DotConverter:
         colour_map = []
 
         # Iterate through edges and get corresponding colours (rank edges)
+
+        for ordered in edges:
+            print(ordered)
         
         for edge in self.graph.get_edges():
             str_edge = str(edge)
-            print(str_edge)
             for ordered in edges:
                 # Get the '->'
                 arrow_i = str_edge.index('->')
                 first_part = str_edge[0:arrow_i]
                 if ordered in first_part:
-
-                    if edges[ordered] < 0.03:
+                    if edges[ordered] < 0.04:
                         colour_map.append('red')
-                    elif edges[ordered] > 0.03 and edges[ordered] < 0.06:
+                    elif edges[ordered] > 0.04 and edges[ordered] < 0.07:
                         colour_map.append('yellow')
-                    elif edges[ordered] > 0.06:
+                    elif edges[ordered] > 0.07:
                         colour_map.append('green')
 
         # Now colour the edges
