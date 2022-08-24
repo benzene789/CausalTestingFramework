@@ -10,10 +10,6 @@ from causal_testing.testing.causal_test_engine import CausalTestEngine
 from causal_testing.testing.estimators import Estimator, LogisticRegressionEstimator
 from causal_testing.testing.causal_test_outcome import CausalTestResult
 
-#from data.improved_csv_gen import new_shipment
-
-from data.improved_2 import new_shipment
-
 import pandas as pd
 import numpy as np
 import random
@@ -125,6 +121,8 @@ def categorical_predictions(type, seen, shipment_df):
     data = pd.read_csv(observational_data_path)
 
     unique_vals = list(data[type].unique())
+    
+    print(unique_vals)
    
     unique_vals.remove(seen)
 
@@ -313,29 +311,24 @@ def collect_shipment():
 
     # New shipment coming in
 
-    # Average alarm chance in the trained DateFrame
+    # Average alarm chance in the trained DataFrame
     average_alarm_chance = data[sys.argv[3]].sum()/len(data)
 
-    shipment = new_shipment(True, average_alarm_chance)
-
-    shipment_df =  pd.DataFrame([shipment], columns=sys.argv[4:])
-    print(shipment_df)
-
     print(edges)
-    return shipment_df, average_alarm_chance, edges
+    return average_alarm_chance, edges
 
+def order_edge_predictions(shipment_df):
 
-def order_edge_predictions():
+    FLOAT_FUZZ_AMOUNT = 5
 
-    FLOAT_FUZZ_AMOUNT = 10
-
-    shipment_df, average_alarm_chance, edges = collect_shipment()
+    average_alarm_chance, edges = collect_shipment()
 
     print('Alarm has a high chance of triggering when above', average_alarm_chance)
     # Fuzz the different nodes in outer layer
-    distances = [] 
+    distances = []
+     
     for fuzz_type in edges:
-        print(fuzz_type)
+        print(shipment_df[fuzz_type].dtypes)
         # Get fuzz value
         seen = shipment_df[fuzz_type].to_numpy()[0]
 

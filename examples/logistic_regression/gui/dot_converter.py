@@ -48,5 +48,4 @@ class DotConverter:
             self.graph.get_edges()[c].set_color(colour_map[c])
             
     def write_png(self):
-
         self.graph.write_png("output.png")
