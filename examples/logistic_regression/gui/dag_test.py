@@ -224,11 +224,21 @@ def distance_metric_float(float_predictions: list, min_alarm_chance: float, seen
     print('=' * 150)
     print('DISTANCE METRIC FOR WEIGHT')
 
+    if max_threshold_below[0] is None:
+        max_threshold_below_list = list(max_threshold_below)
+        max_threshold_below_list[0] = min_alarm_chance
+        max_threshold_below = tuple(max_threshold_below_list)
+    
+    if min_threshold_above[0] is None:
+        min_threshold_above_list = list(min_threshold_above)
+        min_threshold_above_list[0] = min_alarm_chance
+        min_threshold_above = tuple(min_threshold_above_list)
+
     print(max_threshold_below)
     print(min_threshold_above)
 
     if seen > max_threshold_below[0]:
-        print('Need to change weight to ' + str(max_threshold_below[0]) + ' from ' + str(seen))
+        print('Need to change value to ' + str(max_threshold_below[0]) + ' from ' + str(seen))
 
         print('This effects the alarm from ' + str(float_predictions[seen]) + ' to ' + str(max_threshold_below[1]))
 
@@ -238,7 +248,7 @@ def distance_metric_float(float_predictions: list, min_alarm_chance: float, seen
     
     elif seen < min_threshold_above[0]:
 
-        print('Need to change weight to ' + str(min_threshold_above[0]) + ' from ' + str(seen))
+        print('Need to change value to ' + str(min_threshold_above[0]) + ' from ' + str(seen))
 
         print('This effects the alarm from ' + str(float_predictions[seen]) + ' to ' + str(min_threshold_above[1]))
 
@@ -319,7 +329,7 @@ def collect_shipment():
 
 def order_edge_predictions(shipment_df):
 
-    FLOAT_FUZZ_AMOUNT = 5
+    FLOAT_FUZZ_AMOUNT = 3
 
     average_alarm_chance, edges = collect_shipment()
 

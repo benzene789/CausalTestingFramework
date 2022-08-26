@@ -30,7 +30,6 @@ class GUI():
         self.button_vals = []
         self.ordered_edges = {}
         self.important_edges = []
-        self.ordered_edges = {}
         self.edges = None
         self.shipment_df = pd.DataFrame()
         
@@ -51,14 +50,14 @@ class GUI():
         self.get_possible_col_values()
 
         self.root.title('CITCOM Nuclear Detector')
-
+        button_labels = []
         self.canvas.pack()      
         self.img = PhotoImage(file="output.png")      
         self.canvas.create_image(20,20, anchor=NW, image=self.img)
         
-        for k in self.possible_col_values:
+        for col_vals in self.possible_col_values:
             
-            if self.data[k].dtype == 'float':
+            if self.data[col_vals].dtype == 'float':
                 # TextBox Creation
                 inputtxt = Text(self.root,
                                 height = 1,
@@ -68,18 +67,21 @@ class GUI():
             else:
                 clicked = StringVar()
 
-                clicked.set(self.possible_col_values[k][0])
+                clicked.set(self.possible_col_values[col_vals][0])
 
-                option_menu = OptionMenu(self.root, clicked, *self.possible_col_values[k])
+                option_menu = OptionMenu(self.root, clicked, *self.possible_col_values[col_vals])
 
                 self.buttons.append(option_menu)
                 self.button_vals.append(clicked)
 
+            button_labels.append(Label(self.root, text=col_vals))
+
         print(self.button_vals)
 
-        for b in self.buttons:
-            b.pack()
-
+        for button in range(0, len(self.buttons)):
+            button_labels[button].pack()
+            self.buttons[button].pack()
+            
         MyButton1 = Button(self.root, text="Submit", width=10, command=self.run_shipment)
         MyButton1.pack()
         
@@ -136,7 +138,6 @@ class GUI():
                 self.important_edges.append((edge_str, 3))
                 
         # Sort list
-
         self.important_edges.sort(key=lambda e:e[1])
         print(self.important_edges)
         
@@ -156,6 +157,10 @@ class GUI():
         self.graph.write_png()   
         self.img = PhotoImage(file="output.png")      
         self.canvas.create_image(20,20, anchor=NW, image=self.img)
+
+        print('RESET')
+        self.ordered_edges = {}
+        self.important_edges = []
 
         self.root.mainloop()
 

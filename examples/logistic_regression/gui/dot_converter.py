@@ -36,9 +36,9 @@ class DotConverter:
                 arrow_i = str_edge.index('->')
                 first_part = str_edge[0:arrow_i]
                 if ordered in first_part:
-                    if edges[ordered] < 0.04:
+                    if edges[ordered] < 0.035:
                         colour_map.append('red')
-                    elif edges[ordered] > 0.04 and edges[ordered] < 0.07:
+                    elif edges[ordered] > 0.035 and edges[ordered] < 0.07:
                         colour_map.append('yellow')
                     elif edges[ordered] > 0.07:
                         colour_map.append('green')
