@@ -3,15 +3,17 @@ import tkinter
 
 from dot_converter import DotConverter
 
-from dag_test import DAG_FILE, order_edge_predictions, data
+from dag_test import DAG_FILE, order_edge_predictions
 
 import pandas as pd
 
 import sys
 
-#ordered_edges = {'delivery_type': 0.03575459348292154, 'length': 0.06103142107123971, 'S1': 0.14477390855858718, 'S2': 0.2209859128621069, 'delivery_location': 0.3259888140591345, 'S3': 0.4918543484480269}
+import time as tm
 
 # Get necessary graph data
+
+start = tm.time()
 
 class GUI():
     
@@ -24,7 +26,7 @@ class GUI():
         # Remove 'unamed' column
         self.data = self.data.loc[:, ~self.data.columns.str.contains('^Unnamed')]
         self.shipment = []
-        self.canvas = Canvas(self.root, width = 1000, height = 400)
+        self.canvas = Canvas(self.root, width = 1300, height = 500)
         self.img = None
         self.buttons = []
         self.button_vals = []
@@ -79,8 +81,8 @@ class GUI():
         print(self.button_vals)
 
         for button in range(0, len(self.buttons)):
-            button_labels[button].pack()
-            self.buttons[button].pack()
+            button_labels[button].pack(side=LEFT)
+            self.buttons[button].pack(side=LEFT)
             
         MyButton1 = Button(self.root, text="Submit", width=10, command=self.run_shipment)
         MyButton1.pack()
@@ -90,10 +92,10 @@ class GUI():
         amber_key = Label(text='Amber = Moderate Contribution')
         green_key = Label(text='Green = Minor Contribution')
 
-        heading.place(x=800,y=20)
-        red_key.place(x=750,y=40)
-        amber_key.place(x=750,y=60)
-        green_key.place(x=750,y=80)
+        heading.place(x=1000,y=20)
+        red_key.place(x=950,y=40)
+        amber_key.place(x=950,y=60)
+        green_key.place(x=950,y=80)
 
         self.root.mainloop()
         
@@ -117,17 +119,17 @@ class GUI():
         self.colour_edges()
         
     def get_ordered_edges(self):
-        #self.ordered_edges = {'content': 0.031209283053347192, 'country': 0.05132754239279308, 'weight': 0.07810175277126108, 'plane_transport': 0.08514658977367168, 'S1': 0.24569181638837456, 'S2': 0.3230419397194918, 'S3': 0.4215615933802568}
-        self.ordered_edges = order_edge_predictions(self.shipment_df)
-        
-    
+        self.ordered_edges = {'weight': 0.01216715599137369, 'country': 0.05132754239279308, 'content': 0.0568774476997031, 'plane_transport': 0.08514658977367168, 'S1': 0.24569181638837456, 'S2': 0.3230419397194918, 'S3': 0.42156159338025667}
+
+        #self.ordered_edges = order_edge_predictions(self.shipment_df)
+
     def colour_edges(self):
         self.graph.set_edge_colours(self.ordered_edges)
         
         self.edges = self.graph.get_graph()
         
         # Collect all relevant (coloured) edges
-        for edge in self.edges.get_edges():
+        for edge in self.edges.get_nodes():
             # Cast to str from Edge object
             edge_str = str(edge)
             if 'color=red' in edge_str:
@@ -142,13 +144,13 @@ class GUI():
         print(self.important_edges)
         
         # Edge text
-        y_pos = 160
+        y_pos = 120
         for sorted_edge in self.important_edges:
             text_label = sorted_edge[0]
-            bracket_index = text_label.index('[')-2
+            bracket_index = text_label.index('[')-1
             text_label = text_label[0:bracket_index]
             edge_text = Label(text=text_label)
-            edge_text.place(x=780,y=y_pos)
+            edge_text.place(x=1000,y=y_pos)
             y_pos += 20
 
         # Delete the canvas image
@@ -162,6 +164,10 @@ class GUI():
         self.ordered_edges = {}
         self.important_edges = []
 
+        end = tm.time()
+
+        print('TAKEN ', end-start, ' SECONDS')
+
         self.root.mainloop()
 
 if __name__ == "__main__":
@@ -169,4 +175,6 @@ if __name__ == "__main__":
     csv = sys.argv[2]
     gui = GUI(DAG_FILE, csv)
     
+    
     gui.display_gui()
+    

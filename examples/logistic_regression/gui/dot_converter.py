@@ -11,41 +11,33 @@ class DotConverter:
 
         self.graph = graphs[0]
 
-        self.graph.set_bgcolor("antiquewhite")
+        self.graph.set_bgcolor("grey")
 
 
     def get_graph(self):
         return self.graph
 
-    def set_edge_colours(self, edges):
-        # RED EDGES: 0-.3
-        # YELLOW EDGES: .3 - .6
-        # GREEN EDGES 0.6 - 1
+    def set_edge_colours(self, nodes):
+        # RED EDGES: 0-.035
+        # YELLOW EDGES: .035 - .07
+        # GREEN EDGES  > 0.07
 
         colour_map = []
 
         # Iterate through edges and get corresponding colours (rank edges)
 
-        for ordered in edges:
-            print(ordered)
-        
-        for edge in self.graph.get_edges():
-            str_edge = str(edge)
-            for ordered in edges:
-                # Get the '->'
-                arrow_i = str_edge.index('->')
-                first_part = str_edge[0:arrow_i]
-                if ordered in first_part:
-                    if edges[ordered] < 0.035:
-                        colour_map.append('red')
-                    elif edges[ordered] > 0.035 and edges[ordered] < 0.07:
-                        colour_map.append('yellow')
-                    elif edges[ordered] > 0.07:
-                        colour_map.append('green')
+        for node in nodes:
+            if nodes[node] < 0.035:
+                colour_map.append((node, 'red', nodes[node]))
+            elif nodes[node] > 0.035 and nodes[node] < 0.07:
+                colour_map.append((node, 'yellow', nodes[node]))
+            elif nodes[node] > 0.07:
+                colour_map.append((node, 'green', nodes[node]))
 
-        # Now colour the edges
-        for c in range(0, len(self.graph.get_edges())):
-            self.graph.get_edges()[c].set_color(colour_map[c])
-            
+        # Now colour in the nodes
+        for n in colour_map:
+            self.graph.get_node(n[0])[0].set_color(n[1])
+            self.graph.get_node(n[0])[0].set_label(n[0] + ': '+ str(round(n[2], 3)))
+     
     def write_png(self):
         self.graph.write_png("output.png")

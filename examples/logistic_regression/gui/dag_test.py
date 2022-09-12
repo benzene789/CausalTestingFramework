@@ -1,4 +1,5 @@
 
+from signal import alarm
 from causal_testing.specification.causal_dag import CausalDAG
 from causal_testing.specification.scenario import Scenario
 from causal_testing.specification.variable import Input, Output
@@ -30,6 +31,8 @@ observational_data_path = sys.argv[2]
 
 data = pd.read_csv(observational_data_path)
 data = data.loc[:, ~data.columns.str.contains('^Unnamed')]
+
+alarm_col = str(list(data.columns)[len(data.columns)-1])
 
 # 1. Read in the Causal DAG
 causal_dag = CausalDAG(DAG_FILE)
@@ -102,7 +105,7 @@ def get_ate(name, control, treatment, shipment):
         control_input_configuration={scenario.variables[name]: control},
         treatment_input_configuration={scenario.variables[name]: treatment},
         expected_causal_effect=ExactValue(4, tolerance=0.5),
-        outcome_variables={scenario.variables[sys.argv[3]]},
+        outcome_variables={scenario.variables[alarm_col]},
         estimate_type="ate",
     )
     control_prediction, treatment_prediction = test_shipment(
@@ -317,19 +320,21 @@ Calculate if change in alarm, if there is calculate distance from original value
 def collect_shipment():
 
     # Get all edges
-    edges = [dag_edge for dag_edge in causal_dag.graph if sys.argv[3] not in dag_edge]
+    # alarm column may have a different name
+
+    edges = [dag_edge for dag_edge in causal_dag.graph if alarm_col not in dag_edge]
 
     # New shipment coming in
 
     # Average alarm chance in the trained DataFrame
-    average_alarm_chance = data[sys.argv[3]].sum()/len(data)
+    average_alarm_chance = data[alarm_col].sum()/len(data)
 
     print(edges)
     return average_alarm_chance, edges
 
 def order_edge_predictions(shipment_df):
 
-    FLOAT_FUZZ_AMOUNT = 3
+    FLOAT_FUZZ_AMOUNT = 15
 
     average_alarm_chance, edges = collect_shipment()
 
